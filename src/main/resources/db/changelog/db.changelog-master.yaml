@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0000-initial-tag
+      author: codex
+      changes:
+        - tagDatabase:
+            tag: baseline
+  - include:
+      file: db/changelog/changes/0001-initial-schema.yaml
+      relativeToChangelogFile: false
