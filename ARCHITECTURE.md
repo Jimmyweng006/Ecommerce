@@ -68,3 +68,42 @@ CREATE TABLE favorites (
         ON DELETE CASCADE
 ) ENGINE = InnoDB;
 ```
+
+## Authentication Flow
+
+The diagram below illustrates how Spring Security mediates requests, checking credentials on login and validating JWTs on subsequent calls before delegating to application controllers.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant AuthController
+    participant SecurityConfig
+    participant JwtFilter as JwtAuthenticationFilter
+    participant JwtService
+
+    Client->>AuthController: POST /api/v1/auth/login
+    AuthController->>SecurityConfig: delegate to AuthenticationManager
+    SecurityConfig-->>AuthController: Authenticated principal
+    AuthController->>JwtService: generateToken(principal)
+    JwtService-->>AuthController: JWT string
+    AuthController-->>Client: 200 OK + token
+
+    Client->>JwtFilter: GET /api/v1/resource (Authorization: Bearer)
+    JwtFilter->>JwtService: validateToken(token)
+    JwtService-->>JwtFilter: 主體(sub) + 角色 (roles claim)
+    JwtFilter->>SecurityConfig: populate SecurityContext
+    JwtFilter-->>Client: request proceeds to controllers
+```
+
+### Spring Security Components Wiring Snapshot
+
+```mermaid
+graph TD
+    SecurityConfig -->|registers| JwtAuthenticationFilter
+    SecurityConfig -->|exposes| AuthenticationManager
+    SecurityConfig --> PasswordEncoder
+    JwtAuthenticationFilter --> JwtService
+    JwtAuthenticationFilter --> UserDetailsService
+    AuthController --> AuthenticationManager
+    AuthController --> JwtService
+```
