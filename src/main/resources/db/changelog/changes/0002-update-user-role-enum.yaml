@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0002-update-user-role-enum
+      author: codex
+      context: ddl
+      preConditions:
+        onFail: MARK_RAN
+        sqlCheck:
+          expectedResult: "0"
+          sql: >
+            SELECT COUNT(*)
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'users'
+              AND COLUMN_NAME = 'role'
+              AND COLUMN_TYPE = 'enum(''USER'',''ADMIN'')'
+      changes:
+        - modifyDataType:
+            tableName: users
+            columnName: role
+            newDataType: "ENUM('USER','ADMIN')"
+      rollback:
+        - modifyDataType:
+            tableName: users
+            columnName: role
+            newDataType: VARCHAR(50)
