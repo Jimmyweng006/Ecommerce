@@ -107,3 +107,34 @@ graph TD
     AuthController --> AuthenticationManager
     AuthController --> JwtService
 ```
+
+## Admin Product Management Flow
+
+The sequence below outlines how the Admin role creates, updates, or deletes products while relying on our existing JWT security pipeline and layered responsibilities:
+
+```mermaid
+sequenceDiagram
+    participant Admin as Admin Client
+    participant Security as Spring Security Filter Chain
+    participant Controller as AdminProductController
+    participant Service as AdminProductService
+    participant Repo as ProductRepository
+
+    Admin->>Security: POST/PUT/DELETE /api/v1/admin/products
+    Security->>Security: Validate JWT & ADMIN role
+    alt Token or role invalid
+        Security-->>Admin: 401/403 Error Response
+    else Authorized
+        Security->>Controller: Forward request with principal
+        Controller->>Service: handle command DTO
+        Service->>Repo: Persist product changes
+        Repo-->>Service: Product entity
+        alt Create request
+            Service-->>Controller: Created product summary
+            Controller-->>Admin: 201 Created
+        else Update or delete request
+            Service-->>Controller: Updated/deleted acknowledgement
+            Controller-->>Admin: 200 OK / 204 No Content
+        end
+    end
+```

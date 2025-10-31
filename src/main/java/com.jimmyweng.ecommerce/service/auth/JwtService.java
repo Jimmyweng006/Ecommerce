@@ -4,7 +4,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -23,14 +22,9 @@ public class JwtService {
     private final long expirySeconds;
     private final Clock clock;
 
-    @Autowired
     public JwtService(
             @Value("${security.jwt.secret}") String secret,
-            @Value("${security.jwt.expiry-seconds}") long expirySeconds) {
-        this(secret, expirySeconds, Clock.systemUTC());
-    }
-
-    public JwtService(String secret, long expirySeconds, Clock clock) {
+            @Value("${security.jwt.expiry-seconds}") long expirySeconds, Clock clock) {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirySeconds = expirySeconds;
         this.clock = clock;
