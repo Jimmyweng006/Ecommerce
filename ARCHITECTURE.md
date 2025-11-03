@@ -132,9 +132,34 @@ sequenceDiagram
         alt Create request
             Service-->>Controller: Created product summary
             Controller-->>Admin: 201 Created
-        else Update or delete request
-            Service-->>Controller: Updated/deleted acknowledgement
-            Controller-->>Admin: 200 OK / 204 No Content
+        else Update request
+            Service->>Repo: Persist product changes with version check
+            alt Version matches
+                Repo-->>Service: Updated Product entity
+                Service-->>Controller: Updated product summary
+                Controller-->>Admin: 200 OK
+            else Version conflict
+                Repo-->>Service: OptimisticLockException
+                Service-->>Controller: Notify conflict
+                Controller-->>Admin: 409 Conflict
+            end
+        else Delete request
+            Service->>Repo: Soft delete product
+            Repo-->>Service: Confirmation
+            Service-->>Controller: Acknowledge removal
+            Controller-->>Admin: 204 No Content
         end
     end
 ```
+
+### Concurrency Strategy Overview
+
+Order flows must protect inventory integrity under concurrent access. The table below summarizes candidate techniques, their trade-offs, and how they map to this codebase.
+
+| Approach | Advantages | Drawbacks | Usage Notes |
+|----------|------------|-----------|-------------|
+| **Optimistic Lock (`@Version`)** | No blocking; great for read-heavy workloads; detects lost updates | High contention leads to retries; callers must handle `OptimisticLockException` | Ideal for infrequent admin edits. Requires adding a `version` column via Liquibase. |
+| **Pessimistic Lock (`SELECT ... FOR UPDATE`)** | Guarantees serialized updates and prevents overselling | Requests wait for the row; poor ordering can deadlock | If locking multiple products per order, acquire locks in deterministic order (e.g., product id ascending). Configure sensible lock timeout. |
+| **Atomic SQL (`UPDATE ... WHERE stock >= ?`)** | Single statement checks and decrements stock; minimal contention | Must inspect affected row count and throw to rollback on failure | InnoDB acquires a row-level exclusive lock during the update, so concurrent transactions wait until the first commits. Wrap all decrements in one transaction and if any update returns 0 rows, throw business exception to trigger rollback. Compatible with optimistic lock for admin edits. |
+
+Plan: use atomic SQL for user purchases to minimize contention, optionally complement with optimistic locking for admin-facing updates. Pessimistic locking remains a fallback when business rules demand strict serialization; ensure a consistent locking order to avoid deadlocks.

@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0003-add-product-version-column
+      author: codex
+      context: ddl
+      changes:
+        - addColumn:
+            tableName: products
+            columns:
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+        - addNotNullConstraint:
+            tableName: products
+            columnName: version
+            columnDataType: BIGINT
+      rollback:
+        - dropColumn:
+            tableName: products
+            columnName: version

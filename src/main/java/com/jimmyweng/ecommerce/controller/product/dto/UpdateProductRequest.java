@@ -12,4 +12,5 @@ public record UpdateProductRequest(
         @Size(max = 2000) String description,
         @NotBlank @Size(max = 100) String category,
         @NotNull @DecimalMin(value = "0.0", inclusive = false) BigDecimal price,
-        @NotNull @Min(0) Integer stock) {}
+        @NotNull @Min(0) Integer stock,
+        @NotNull Long version) {}

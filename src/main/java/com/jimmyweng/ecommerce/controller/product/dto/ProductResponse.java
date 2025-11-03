@@ -14,7 +14,8 @@ public record ProductResponse(
         Integer stock,
         Instant createdAt,
         Instant updatedAt,
-        Instant deletedAt) {
+        Instant deletedAt,
+        Long version) {
 
     public static ProductResponse from(Product product) {
         return new ProductResponse(
@@ -26,6 +27,7 @@ public record ProductResponse(
                 product.getStock(),
                 product.getCreatedAt(),
                 product.getUpdatedAt(),
-                product.getDeletedAt());
+                product.getDeletedAt(),
+                product.getVersion());
     }
 }

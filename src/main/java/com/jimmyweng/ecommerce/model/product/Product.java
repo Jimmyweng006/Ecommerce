@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -48,6 +49,10 @@ public class Product {
 
     @Column(name = "deleted_at")
     private Instant deletedAt;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
 
     public Product(String title, String description, String category, BigDecimal price, Integer stock) {
         this.title = title;

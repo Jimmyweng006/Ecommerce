@@ -55,7 +55,8 @@ public class AdminProductController {
                         request.description(),
                         request.category(),
                         request.price(),
-                        request.stock()));
+                        request.stock(),
+                        request.version()));
         return ProductResponse.from(product);
     }
 

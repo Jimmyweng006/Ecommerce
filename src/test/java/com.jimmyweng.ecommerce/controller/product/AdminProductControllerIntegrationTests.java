@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jimmyweng.ecommerce.constant.ErrorMessages;
 import com.jimmyweng.ecommerce.constant.Role;
 import com.jimmyweng.ecommerce.controller.auth.dto.LoginRequest;
 import com.jimmyweng.ecommerce.controller.product.dto.CreateProductRequest;
@@ -63,14 +64,19 @@ class AdminProductControllerIntegrationTests {
         userRepository.deleteAll();
 
         User admin = new User(ADMIN_EMAIL, passwordEncoder.encode(ADMIN_PASSWORD), Role.ADMIN);
-        userRepository.save(admin);
+        userRepository.saveAndFlush(admin);
     }
 
     @Test
     void create_product_returns_created_response() throws Exception {
         String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
         CreateProductRequest request =
-                new CreateProductRequest("Board Game", "Cooperative sci-fi adventure", "board-games", new BigDecimal("79.99"), 50);
+                new CreateProductRequest(
+                        "Board Game",
+                        "Cooperative sci-fi adventure",
+                        "board-games",
+                        new BigDecimal("79.99"),
+                        50);
 
         mockMvc.perform(post("/api/v1/admin/products")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -79,72 +85,22 @@ class AdminProductControllerIntegrationTests {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Board Game"))
                 .andExpect(jsonPath("$.category").value("board-games"))
-                .andExpect(jsonPath("$.price").value(79.99));
+                .andExpect(jsonPath("$.price").value(79.99))
+                .andExpect(jsonPath("$.version").value(0));
 
         assertEquals(1, productRepository.count());
-    }
-
-    @Test
-    void update_product_returns_updated_payload() throws Exception {
-        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
-        Product saved = productRepository.save(
-                new Product("Old Title", "Old description", "board-games", new BigDecimal("49.99"), 10));
-
-        UpdateProductRequest request =
-                new UpdateProductRequest("New Title", "New description", "strategy", new BigDecimal("59.99"), 25);
-
-        mockMvc.perform(put("/api/v1/admin/products/{id}", saved.getId())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("Authorization", "Bearer " + token)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.title").value("New Title"))
-                .andExpect(jsonPath("$.category").value("strategy"))
-                .andExpect(jsonPath("$.price").value(59.99));
-
-        Product updated = productRepository.findById(saved.getId()).orElseThrow();
-        assertEquals("New Title", updated.getTitle());
-        assertEquals("New description", updated.getDescription());
-        assertEquals("strategy", updated.getCategory());
-        assertEquals(new BigDecimal("59.99"), updated.getPrice());
-        assertEquals(25, updated.getStock());
-    }
-
-    @Test
-    void delete_product_marks_soft_delete() throws Exception {
-        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
-        Product saved = productRepository.save(
-                new Product("Delete Me", "To be removed", "misc", new BigDecimal("19.99"), 5));
-
-        mockMvc.perform(delete("/api/v1/admin/products/{id}", saved.getId())
-                        .header("Authorization", "Bearer " + token))
-                .andExpect(status().isNoContent());
-
-        Product deleted = productRepository.findById(saved.getId()).orElseThrow();
-        assertNotNull(deleted.getDeletedAt());
-        assertTrue(deleted.getDeletedAt().isAfter(deleted.getCreatedAt()) || deleted.getDeletedAt().equals(deleted.getCreatedAt()));
-    }
-
-    @Test
-    void update_nonexistent_product_returns_not_found() throws Exception {
-        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
-        UpdateProductRequest request =
-                new UpdateProductRequest("Missing", "Will fail", "misc", new BigDecimal("9.99"), 1);
-
-        mockMvc.perform(put("/api/v1/admin/products/{id}", 9999L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("Authorization", "Bearer " + token)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.ret_code").value(-1))
-                .andExpect(jsonPath("$.msg").value("Product not found: 9999"));
     }
 
     @Test
     void create_product_with_invalid_payload_returns_bad_request() throws Exception {
         String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
         CreateProductRequest request =
-                new CreateProductRequest("", "Desc", "misc", new BigDecimal("10.00"), 1);
+                new CreateProductRequest(
+                        "",
+                        "Desc",
+                        "misc",
+                        new BigDecimal("10.00"),
+                        1);
 
         mockMvc.perform(post("/api/v1/admin/products")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -155,13 +111,137 @@ class AdminProductControllerIntegrationTests {
                 .andExpect(jsonPath("$.msg").exists());
     }
 
+
+    @Test
+    void update_product_returns_updated_payload() throws Exception {
+        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
+        Product saved = productRepository.saveAndFlush(
+                new Product(
+                        "Old Title",
+                        "Old description",
+                        "board-games",
+                        new BigDecimal("49.99"),
+                        10));
+
+        UpdateProductRequest request =
+                new UpdateProductRequest(
+                        "New Title",
+                        "New description",
+                        "strategy",
+                        new BigDecimal("59.99"),
+                        25,
+                        saved.getVersion());
+
+        mockMvc.perform(put("/api/v1/admin/products/{id}", saved.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + token)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("New Title"))
+                .andExpect(jsonPath("$.category").value("strategy"))
+                .andExpect(jsonPath("$.price").value(59.99))
+                .andExpect(jsonPath("$.version").value(1));
+
+        Product updated = productRepository.findById(saved.getId()).orElseThrow();
+        assertEquals("New Title", updated.getTitle());
+        assertEquals("New description", updated.getDescription());
+        assertEquals("strategy", updated.getCategory());
+        assertEquals(new BigDecimal("59.99"), updated.getPrice());
+        assertEquals(25, updated.getStock());
+    }
+
+    @Test
+    void update_nonexistent_product_returns_not_found() throws Exception {
+        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
+        UpdateProductRequest request =
+                new UpdateProductRequest("Missing",
+                        "Will fail",
+                        "misc",
+                        new BigDecimal("9.99"),
+                        1,
+                        0L);
+
+        mockMvc.perform(put("/api/v1/admin/products/{id}", 9999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + token)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.ret_code").value(-1))
+                .andExpect(jsonPath("$.msg").value(ErrorMessages.productNotFound(9999L)));
+    }
+
+    @Test
+    void update_product_with_stale_version_returns_conflict() throws Exception {
+        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
+        Product saved = productRepository.saveAndFlush(
+                new Product(
+                        "Hot Item",
+                        "Initial",
+                        "misc",
+                        new BigDecimal("29.99"),
+                        10));
+        long staleVersion = saved.getVersion();
+
+        // Simulate another admin updating the product first
+        saved.applyUpdate(
+                "Hot Item",
+                "Updated description",
+                "misc",
+                new BigDecimal("29.99"),
+                9);
+        productRepository.saveAndFlush(saved);
+
+        UpdateProductRequest request =
+                new UpdateProductRequest(
+                        "Hot Item",
+                        "Conflicting update",
+                        "misc",
+                        new BigDecimal("27.99"),
+                        8,
+                        staleVersion);
+
+        mockMvc.perform(put("/api/v1/admin/products/{id}", saved.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + token)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.ret_code").value(-1))
+                .andExpect(jsonPath("$.msg").value(ErrorMessages.RESOURCE_MODIFIED));
+    }
+
+    @Test
+    void delete_product_marks_soft_delete() throws Exception {
+        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
+        Product saved = productRepository.saveAndFlush(
+                new Product(
+                        "Delete Me",
+                        "To be removed",
+                        "misc",
+                        new BigDecimal("19.99"),
+                        5));
+
+        mockMvc.perform(delete("/api/v1/admin/products/{id}", saved.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        Product deleted = productRepository.findById(saved.getId()).orElseThrow();
+        assertNotNull(deleted.getDeletedAt());
+        assertTrue(deleted.getDeletedAt().isAfter(
+                deleted.getCreatedAt()) || deleted.getDeletedAt().equals(deleted.getCreatedAt()));
+    }
+
     @Test
     void delete_product_with_non_admin_should_be_forbidden() throws Exception {
-        Product saved = productRepository.save(
-                new Product("Protected", "Only admins can delete", "misc", new BigDecimal("9.99"), 1));
+        Product saved = productRepository.saveAndFlush(
+                new Product(
+                        "Protected",
+                        "Only admins can delete",
+                        "misc",
+                        new BigDecimal("9.99"),
+                        1));
 
         User nonAdmin = new User(USER_EMAIL, passwordEncoder.encode(USER_PASSWORD), Role.USER);
-        userRepository.save(nonAdmin);
+        userRepository.saveAndFlush(nonAdmin);
 
         String token = obtainToken(USER_EMAIL, USER_PASSWORD);
 
