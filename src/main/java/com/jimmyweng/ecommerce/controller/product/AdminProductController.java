@@ -1,5 +1,7 @@
 package com.jimmyweng.ecommerce.controller.product;
 
+import com.jimmyweng.ecommerce.config.OpenApiConfig;
+import com.jimmyweng.ecommerce.controller.common.ApiResponseEnvelope;
 import com.jimmyweng.ecommerce.controller.product.dto.CreateProductRequest;
 import com.jimmyweng.ecommerce.controller.product.dto.ProductResponse;
 import com.jimmyweng.ecommerce.controller.product.dto.UpdateProductRequest;
@@ -8,6 +10,12 @@ import com.jimmyweng.ecommerce.service.product.AdminProductService;
 import com.jimmyweng.ecommerce.service.product.dto.CreateProductCommand;
 import com.jimmyweng.ecommerce.service.product.dto.UpdateProductCommand;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -32,6 +40,19 @@ public class AdminProductController {
         this.adminProductService = adminProductService;
     }
 
+    @Operation(
+            summary = "Create a new product",
+            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME))
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Product created",
+                content = @Content(schema = @Schema(implementation = ProductResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Validation failed",
+                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication required",
+                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class))),
+        @ApiResponse(responseCode = "403", description = "Only admins may create products",
+                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class)))
+    })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ProductResponse createProduct(@Valid @RequestBody CreateProductRequest request) {
@@ -45,6 +66,23 @@ public class AdminProductController {
         return ProductResponse.from(product);
     }
 
+    @Operation(
+            summary = "Update an existing product",
+            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME))
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Product updated",
+                content = @Content(schema = @Schema(implementation = ProductResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Validation failed",
+                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication required",
+                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class))),
+        @ApiResponse(responseCode = "403", description = "Only admins may update products",
+                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class))),
+        @ApiResponse(responseCode = "404", description = "Product not found",
+                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class))),
+        @ApiResponse(responseCode = "409", description = "Product version conflict",
+                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class)))
+    })
     @PutMapping("/{productId}")
     public ProductResponse updateProduct(
             @PathVariable Long productId, @Valid @RequestBody UpdateProductRequest request) {
@@ -60,6 +98,18 @@ public class AdminProductController {
         return ProductResponse.from(product);
     }
 
+    @Operation(
+            summary = "Soft delete a product",
+            security = @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME))
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Product deleted"),
+        @ApiResponse(responseCode = "401", description = "Authentication required",
+                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class))),
+        @ApiResponse(responseCode = "403", description = "Only admins may delete products",
+                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class))),
+        @ApiResponse(responseCode = "404", description = "Product not found",
+                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class)))
+    })
     @DeleteMapping("/{productId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteProduct(@PathVariable Long productId) {
