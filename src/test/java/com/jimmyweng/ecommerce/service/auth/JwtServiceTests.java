@@ -1,6 +1,5 @@
-package com.jimmyweng.ecommerce.service;
+package com.jimmyweng.ecommerce.service.auth;
 
-import com.jimmyweng.ecommerce.service.auth.JwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import java.time.Clock;

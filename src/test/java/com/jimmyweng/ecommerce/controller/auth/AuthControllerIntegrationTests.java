@@ -1,4 +1,4 @@
-package com.jimmyweng.ecommerce.controller;
+package com.jimmyweng.ecommerce.controller.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
