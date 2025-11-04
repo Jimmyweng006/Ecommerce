@@ -60,9 +60,6 @@ class AdminProductControllerIntegrationTests {
 
     @BeforeEach
     void setUp() {
-        productRepository.deleteAll();
-        userRepository.deleteAll();
-
         User admin = new User(ADMIN_EMAIL, passwordEncoder.encode(ADMIN_PASSWORD), Role.ADMIN);
         userRepository.saveAndFlush(admin);
     }

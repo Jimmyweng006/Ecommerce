@@ -12,6 +12,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import static com.jimmyweng.ecommerce.constant.ErrorMessages.userNotFound;
+
 @Service
 public class EcommerceUserDetailsService implements UserDetailsService {
 
@@ -25,7 +27,7 @@ public class EcommerceUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         User user = userRepository
                 .findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+                .orElseThrow(() -> new UsernameNotFoundException(userNotFound(email)));
 
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(), user.getPasswordHash(), mapAuthorities(user.getRole()));

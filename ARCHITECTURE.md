@@ -156,10 +156,56 @@ sequenceDiagram
 
 Order flows must protect inventory integrity under concurrent access. The table below summarizes candidate techniques, their trade-offs, and how they map to this codebase.
 
-| Approach | Advantages | Drawbacks | Usage Notes |
-|----------|------------|-----------|-------------|
-| **Optimistic Lock (`@Version`)** | No blocking; great for read-heavy workloads; detects lost updates | High contention leads to retries; callers must handle `OptimisticLockException` | Ideal for infrequent admin edits. Requires adding a `version` column via Liquibase. |
-| **Pessimistic Lock (`SELECT ... FOR UPDATE`)** | Guarantees serialized updates and prevents overselling | Requests wait for the row; poor ordering can deadlock | If locking multiple products per order, acquire locks in deterministic order (e.g., product id ascending). Configure sensible lock timeout. |
-| **Atomic SQL (`UPDATE ... WHERE stock >= ?`)** | Single statement checks and decrements stock; minimal contention | Must inspect affected row count and throw to rollback on failure | InnoDB acquires a row-level exclusive lock during the update, so concurrent transactions wait until the first commits. Wrap all decrements in one transaction and if any update returns 0 rows, throw business exception to trigger rollback. Compatible with optimistic lock for admin edits. |
+| Approach | Advantages | Drawbacks | Usage Notes                                                                                                                                                                                                                                                                                                                                                                   |
+|----------|------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Optimistic Lock (`@Version`)** | No blocking; great for read-heavy workloads; detects lost updates | High contention leads to retries; callers must handle `OptimisticLockException` | Ideal for infrequent admin edits. Requires adding a `version` column via Liquibase.                                                                                                                                                                                                                                                                                           |
+| **Pessimistic Lock (`SELECT ... FOR UPDATE`)** | Guarantees serialized updates and prevents overselling | Requests wait for the row; poor ordering can deadlock | If locking multiple products per order, acquire locks in deterministic order (e.g., product id ascending). Configure sensible lock timeout.                                                                                                                                                                                                                                   |
+| **Atomic SQL (`UPDATE ... WHERE stock >= ?`)** | Single statement checks and decrements stock; minimal contention | Must inspect affected row count and throw to rollback on failure | InnoDB acquires a row-level exclusive lock during the update, so concurrent transactions wait until the first commits. Wrap all decrements in one transaction(acquire locks in deterministic order for multiple products per order scenario) and if any update returns 0 rows, throw business exception to trigger rollback. Compatible with optimistic lock for admin edits. |
 
 Plan: use atomic SQL for user purchases to minimize contention, optionally complement with optimistic locking for admin-facing updates. Pessimistic locking remains a fallback when business rules demand strict serialization; ensure a consistent locking order to avoid deadlocks.
+
+## User Purchase Flow
+
+The following sequence illustrates how a customer checks out a cart. Stock deductions rely on atomic SQL updates to avoid overselling while all operations remain within a single transaction.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Auth as AuthController
+    participant Security as Security Filter Chain
+    participant Checkout as CheckoutController
+    participant Service as CheckoutService
+    participant Repo as OrderRepository / ProductRepository
+    participant DB as MySQL
+
+    User->>Auth: POST /api/v1/auth/login
+    Auth-->>User: JWT
+
+    User->>Security: POST /api/v1/orders (Bearer JWT)
+    Security-->>Checkout: Authenticated request
+
+    Checkout->>Service: createOrder(cartItems)
+    Service->>Service: sort productIds ascending
+    loop for each item
+        Service->>Repo: atomic decrement (stock - qty) WHERE stock >= qty
+        Repo->>DB: UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?
+        DB-->>Repo: affected rows (0 => insufficient stock)
+        Repo-->>Service: success/failure
+    end
+    alt any item failed
+        Service->>DB: rollback transaction
+        Service-->>Checkout: throw OutOfStockException
+        Checkout-->>User: 409 Conflict (ret_code -1)
+    else all succeeded
+        Service->>Repo: persist Order + OrderItems
+        Repo->>DB: INSERT order / items
+        Service-->>Checkout: Order summary
+        Checkout-->>User: 201 Created (ret_code 0)
+    end
+```
+
+Key points:
+- Atomic SQL prevents overselling and avoids mixing read/write logic in the service.
+- Products are processed in deterministic order (by product id) to reduce deadlock risk.
+- Any failure (stock < requested quantity) results in a transaction rollback and a conflict response.
+

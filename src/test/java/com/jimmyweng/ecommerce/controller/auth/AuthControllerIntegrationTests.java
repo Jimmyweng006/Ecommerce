@@ -8,7 +8,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jimmyweng.ecommerce.constant.ErrorMessages;
 import com.jimmyweng.ecommerce.constant.Role;
-import com.jimmyweng.ecommerce.controller.auth.dto.AuthResponse;
 import com.jimmyweng.ecommerce.controller.auth.dto.LoginRequest;
 import com.jimmyweng.ecommerce.controller.common.ApiResponseEnvelope;
 import com.jimmyweng.ecommerce.model.User;
@@ -22,12 +21,14 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@Transactional
 class AuthControllerIntegrationTests {
 
     @Autowired
@@ -44,7 +45,6 @@ class AuthControllerIntegrationTests {
 
     @BeforeEach
     void setUp() {
-        userRepository.deleteAll();
         User user = new User("customer@example.com", passwordEncoder.encode("password"), Role.USER);
         userRepository.save(user);
     }

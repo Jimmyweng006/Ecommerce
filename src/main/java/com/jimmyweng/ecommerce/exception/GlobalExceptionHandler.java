@@ -55,6 +55,11 @@ public class GlobalExceptionHandler {
         return buildExceptionResponse(HttpStatus.CONFLICT, ErrorMessages.RESOURCE_MODIFIED);
     }
 
+    @ExceptionHandler(OutOfStockException.class)
+    public ResponseEntity<ApiResponseEnvelope> handleOutOfStock(OutOfStockException ex) {
+        return buildExceptionResponse(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponseEnvelope> handleGeneric(Exception ex) {
         log.error("Unhandled exception", ex);
