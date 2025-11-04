@@ -1,10 +1,13 @@
 package com.jimmyweng.ecommerce.exception;
 
+import com.jimmyweng.ecommerce.constant.ErrorMessages;
+import com.jimmyweng.ecommerce.controller.common.ApiResponseEnvelope;
 import java.time.Instant;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
-import com.jimmyweng.ecommerce.constant.ErrorMessages;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -19,51 +22,50 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleResourceNotFound(ResourceNotFoundException ex) {
-        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    public ResponseEntity<ApiResponseEnvelope> handleResourceNotFound(ResourceNotFoundException ex) {
+        return buildExceptionResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ApiResponseEnvelope> handleValidation(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(this::formatFieldError)
                 .collect(Collectors.joining(", "));
         if (message.isBlank()) {
             message = ErrorMessages.VALIDATION_FAILED;
         }
-        return buildResponse(HttpStatus.BAD_REQUEST, message);
+        return buildExceptionResponse(HttpStatus.BAD_REQUEST, message);
     }
 
     @ExceptionHandler({AuthenticationException.class, BadCredentialsException.class})
-    public ResponseEntity<Map<String, Object>> handleAuthentication(AuthenticationException ex) {
-        return buildResponse(HttpStatus.UNAUTHORIZED, ErrorMessages.AUTHENTICATION_FAILED);
+    public ResponseEntity<ApiResponseEnvelope> handleAuthentication(AuthenticationException ex) {
+        return buildExceptionResponse(HttpStatus.UNAUTHORIZED, ErrorMessages.AUTHENTICATION_FAILED);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
-        return buildResponse(HttpStatus.FORBIDDEN, ErrorMessages.ACCESS_DENIED);
+    public ResponseEntity<ApiResponseEnvelope> handleAccessDenied(AccessDeniedException ex) {
+        return buildExceptionResponse(HttpStatus.FORBIDDEN, ErrorMessages.ACCESS_DENIED);
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-    public ResponseEntity<Map<String, Object>> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
-        return buildResponse(HttpStatus.CONFLICT, ErrorMessages.RESOURCE_MODIFIED);
+    public ResponseEntity<ApiResponseEnvelope> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+        return buildExceptionResponse(HttpStatus.CONFLICT, ErrorMessages.RESOURCE_MODIFIED);
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ErrorMessages.UNEXPECTED_ERROR);
+    public ResponseEntity<ApiResponseEnvelope> handleGeneric(Exception ex) {
+        log.error("Unhandled exception", ex);
+        return buildExceptionResponse(HttpStatus.INTERNAL_SERVER_ERROR, ErrorMessages.UNEXPECTED_ERROR);
     }
 
-    private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("ret_code", status.is2xxSuccessful() ? 0 : -1);
-        body.put("msg", message);
-        body.put("data", new HashMap<>());
-        Map<String, Object> meta = new HashMap<>();
-        meta.put("timestamp", Instant.now().toString());
-        body.put("meta", meta);
-        return ResponseEntity.status(status).body(body);
+    private ResponseEntity<ApiResponseEnvelope> buildExceptionResponse(HttpStatus status, String message) {
+        Map<String, Object> meta = Map.of("timestamp", Instant.now().toString());
+        ApiResponseEnvelope envelope = new ApiResponseEnvelope(-1, message, Collections.emptyMap(), meta);
+
+        return ResponseEntity.status(status).body(envelope);
     }
 
     private String formatFieldError(FieldError error) {

@@ -2,7 +2,8 @@ package com.jimmyweng.ecommerce.controller.auth;
 
 import com.jimmyweng.ecommerce.controller.auth.dto.AuthResponse;
 import com.jimmyweng.ecommerce.controller.auth.dto.LoginRequest;
-import com.jimmyweng.ecommerce.controller.common.ApiResponseEnvelope;
+import com.jimmyweng.ecommerce.controller.common.doc.AuthResponseEnvelopeDoc;
+import com.jimmyweng.ecommerce.controller.common.doc.EnvelopeErrorDoc;
 import com.jimmyweng.ecommerce.service.auth.JwtService;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,11 +38,11 @@ public class AuthController {
     @Operation(summary = "Authenticate user credentials and issue JWT")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Login successful",
-                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class))),
+                content = @Content(schema = @Schema(implementation = AuthResponseEnvelopeDoc.class))),
         @ApiResponse(responseCode = "400", description = "Invalid request payload",
-                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class))),
+                content = @Content(schema = @Schema(implementation = EnvelopeErrorDoc.class))),
         @ApiResponse(responseCode = "401", description = "Bad credentials",
-                content = @Content(schema = @Schema(implementation = ApiResponseEnvelope.class)))
+                content = @Content(schema = @Schema(implementation = EnvelopeErrorDoc.class)))
     })
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
@@ -49,6 +50,7 @@ public class AuthController {
                 new UsernamePasswordAuthenticationToken(request.email(), request.password()));
         UserDetails principal = (UserDetails) authentication.getPrincipal();
         String token = jwtService.generateToken(principal);
+
         return ResponseEntity.ok(new AuthResponse(token));
     }
 }

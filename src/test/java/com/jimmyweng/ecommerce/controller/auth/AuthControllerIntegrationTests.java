@@ -6,9 +6,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jimmyweng.ecommerce.constant.ErrorMessages;
 import com.jimmyweng.ecommerce.constant.Role;
 import com.jimmyweng.ecommerce.controller.auth.dto.AuthResponse;
 import com.jimmyweng.ecommerce.controller.auth.dto.LoginRequest;
+import com.jimmyweng.ecommerce.controller.common.ApiResponseEnvelope;
 import com.jimmyweng.ecommerce.model.User;
 import com.jimmyweng.ecommerce.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +22,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.Map;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -55,13 +59,16 @@ class AuthControllerIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").exists())
+                .andExpect(jsonPath("$.ret_code").value(0))
+                .andExpect(jsonPath("$.msg").value("OK"))
+                .andExpect(jsonPath("$.data.token").exists())
+                .andExpect(jsonPath("$.meta.timestamp").exists())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
 
-        AuthResponse authResponse = objectMapper.readValue(response, AuthResponse.class);
-        assertThat(authResponse.token()).isNotBlank();
+        ApiResponseEnvelope apiResponseEnvelope = objectMapper.readValue(response, ApiResponseEnvelope.class);
+        assertThat((((Map<String, String>) apiResponseEnvelope.data()).get("token"))).isNotBlank();
     }
 
     @Test
@@ -72,6 +79,8 @@ class AuthControllerIntegrationTests {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.ret_code").value(-1))
+                .andExpect(jsonPath("$.msg").value(ErrorMessages.AUTHENTICATION_FAILED));
     }
 }

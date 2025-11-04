@@ -83,10 +83,13 @@ class AdminProductControllerIntegrationTests {
                         .header("Authorization", "Bearer " + token)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.title").value("Board Game"))
-                .andExpect(jsonPath("$.category").value("board-games"))
-                .andExpect(jsonPath("$.price").value(79.99))
-                .andExpect(jsonPath("$.version").value(0));
+                .andExpect(jsonPath("$.ret_code").value(0))
+                .andExpect(jsonPath("$.msg").value("OK"))
+                .andExpect(jsonPath("$.data.title").value("Board Game"))
+                .andExpect(jsonPath("$.data.category").value("board-games"))
+                .andExpect(jsonPath("$.data.price").value(79.99))
+                .andExpect(jsonPath("$.data.version").value(0))
+                .andExpect(jsonPath("$.meta.timestamp").exists());
 
         assertEquals(1, productRepository.count());
     }
@@ -137,10 +140,13 @@ class AdminProductControllerIntegrationTests {
                         .header("Authorization", "Bearer " + token)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.title").value("New Title"))
-                .andExpect(jsonPath("$.category").value("strategy"))
-                .andExpect(jsonPath("$.price").value(59.99))
-                .andExpect(jsonPath("$.version").value(1));
+                .andExpect(jsonPath("$.ret_code").value(0))
+                .andExpect(jsonPath("$.msg").value("OK"))
+                .andExpect(jsonPath("$.data.title").value("New Title"))
+                .andExpect(jsonPath("$.data.category").value("strategy"))
+                .andExpect(jsonPath("$.data.price").value(59.99))
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.meta.timestamp").exists());
 
         Product updated = productRepository.findById(saved.getId()).orElseThrow();
         assertEquals("New Title", updated.getTitle());
@@ -259,6 +265,6 @@ class AdminProductControllerIntegrationTests {
                 .andReturn()
                 .getResponse()
                 .getContentAsString());
-        return response.get("token").asText();
+        return response.get("data").get("token").asText();
     }
 }
