@@ -63,12 +63,11 @@ public class CheckoutService {
         checkProductExist(productsById, productIds);
 
         Order order = new Order(user, OrderStatus.PENDING, command.idempotencyKey(), BigDecimal.ZERO);
-
         decrementStock(sortedItems, productsById, order);
-
         order.setTotalAmount(getOrderTotalAmount(sortedItems, productsById));
 
-        return new CheckoutResult(orderRepository.save(order), false);
+        Order savedOrder = orderRepository.save(order);
+        return new CheckoutResult(savedOrder, false);
     }
 
     private void checkProductExist(Map<Long, Product> productsById, Set<Long> productIds) {
