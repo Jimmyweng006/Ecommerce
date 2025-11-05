@@ -64,6 +64,7 @@ public class OrderController {
             Principal principal, @Valid @RequestBody CreateOrderRequest request) {
         CheckoutResult result = checkoutService.createOrder(principal.getName(), toCommand(request));
         HttpStatus status = result.duplicate() ? HttpStatus.OK : HttpStatus.CREATED;
+
         return ResponseEntity.status(status).body(OrderResponse.from(result.order()));
     }
 

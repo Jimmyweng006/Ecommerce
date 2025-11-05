@@ -137,6 +137,55 @@ class OrderControllerIntegrationTests {
         assertThat(updated.getStock()).isEqualTo(4);
     }
 
+    @Test
+    void unordered_multi_product_orders_from_different_users_complete_without_deadlock() throws Exception {
+        Product firstProduct = productRepository.save(
+                new Product("Desk Lamp", "Modern", "home", new BigDecimal("39.99"), 5));
+        Product secondProduct = productRepository.save(
+                new Product("Standing Desk", "Ergonomic", "office", new BigDecimal("299.99"), 5));
+
+        User anotherUser =
+                new User("second@example.com", passwordEncoder.encode("password"), Role.USER);
+        userRepository.save(anotherUser);
+
+        String firstToken = obtainToken("customer@example.com", "password");
+        String secondToken = obtainToken("second@example.com", "password");
+
+        String firstOrderPayload = objectMapper.writeValueAsString(Map.of(
+                "idempotencyKey", UUID.randomUUID().toString(),
+                "items",
+                        List.of(
+                                Map.of("productId", firstProduct.getId(), "quantity", 1),
+                                Map.of("productId", secondProduct.getId(), "quantity", 1))));
+
+        String secondOrderPayload = objectMapper.writeValueAsString(Map.of(
+                "idempotencyKey", UUID.randomUUID().toString(),
+                "items",
+                        List.of(
+                                Map.of("productId", secondProduct.getId(), "quantity", 1),
+                                Map.of("productId", firstProduct.getId(), "quantity", 1))));
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + firstToken)
+                        .content(firstOrderPayload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ret_code").value(0));
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + secondToken)
+                        .content(secondOrderPayload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ret_code").value(0));
+
+        Product firstUpdated = productRepository.findById(firstProduct.getId()).orElseThrow();
+        Product secondUpdated = productRepository.findById(secondProduct.getId()).orElseThrow();
+        assertThat(firstUpdated.getStock()).isEqualTo(3);
+        assertThat(secondUpdated.getStock()).isEqualTo(3);
+        assertThat(orderRepository.count()).isEqualTo(2);
+    }
+
     private String obtainToken(String email, String password) throws Exception {
         String response = mockMvc
                 .perform(post("/api/v1/auth/login")
