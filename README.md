@@ -54,6 +54,10 @@ The API is documented with OpenAPI 3 via springdoc-openapi:
   - `DELETE /api/v1/admin/products/{productId}` – Soft-delete a product (requires `ROLE_ADMIN`).
 - **Orders**
   - `POST /api/v1/orders` – Create an order for the authenticated user with atomic stock decrement (requires `ROLE_USER`).
+- **Favorites**
+  - `POST /api/v1/favorites` – Add a product to the authenticated user's favorites list (requires `ROLE_USER`).
+  - `GET /api/v1/favorites` – Retrieve the authenticated user's favorite products in reverse chronological order.
+  - `DELETE /api/v1/favorites/{productId}` – Remove a product from the favorites list (idempotent, requires `ROLE_USER`).
 
 ## Test
 

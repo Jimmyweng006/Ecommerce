@@ -164,7 +164,7 @@ Order flows must protect inventory integrity under concurrent access. The table 
 
 Plan: use atomic SQL for user purchases to minimize contention, optionally complement with optimistic locking for admin-facing updates. Pessimistic locking remains a fallback when business rules demand strict serialization; ensure a consistent locking order to avoid deadlocks.
 
-## User Purchase Flow
+## User Product Purchase Flow
 
 The following sequence illustrates how a customer checks out a cart. Stock deductions rely on atomic SQL updates to avoid overselling while all operations remain within a single transaction.
 
@@ -209,3 +209,39 @@ Key points:
 - Products are processed in deterministic order (by product id) to reduce deadlock risk.
 - Any failure (stock < requested quantity) results in a transaction rollback and a conflict response.
 
+## User Favorites Management Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Security as Security Filter Chain
+    participant FavoritesApi as FavoriteController
+    participant Service as FavoriteService
+    participant Repos as FavoriteRepository / ProductRepository
+
+    User->>Security: POST/GET/DELETE /api/v1/favorites (Bearer JWT)
+    Security->>Security: Validate JWT & USER role
+    alt Token invalid or wrong role
+        Security-->>User: 401/403 error envelope
+    else Authorized
+        Security->>FavoritesApi: Forward request with principal
+        alt Add favorite
+            FavoritesApi->>Service: addFavorite(email, productId)
+            Service->>Repos: ensure product exists & not deleted
+            Service->>Repos: insert favorite row if absent
+            Service-->>FavoritesApi: created or already existed
+            FavoritesApi-->>User: 201 Created or 200 OK with product payload
+        else List favorites
+            FavoritesApi->>Service: listFavorites(email)
+            Service->>Repos: fetch favorites ordered by created_at desc
+            Service->>Repos: load active products for ids
+            Service-->>FavoritesApi: products snapshot
+            FavoritesApi-->>User: 200 OK with product list
+        else Remove favorite
+            FavoritesApi->>Service: removeFavorite(email, productId)
+            Service->>Repos: delete favorite row (idempotent)
+            Service-->>FavoritesApi: acknowledgement
+            FavoritesApi-->>User: 204 No Content
+        end
+    end
+```
