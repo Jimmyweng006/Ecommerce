@@ -26,7 +26,7 @@ class JwtServiceTests {
     }
 
     @Test
-    void generateToken_shouldEmbedSubjectAndRoles() {
+    void generateToken_whenUserProvided_embedSubjectAndRoles() {
         UserDetails userDetails =
                 User.withUsername("tester@example.com").password("password").roles("USER").build();
 
@@ -39,12 +39,12 @@ class JwtServiceTests {
     }
 
     @Test
-    void parseClaims_shouldRejectInvalidToken() {
+    void parseClaims_whenTokenInvalid_throwIllegalArgument() {
         assertThrows(IllegalArgumentException.class, () -> jwtService.parseClaims("bad-token"));
     }
 
     @Test
-    void isTokenValid_shouldReturnFalseWhenTokenExpired() {
+    void isTokenValid_whenTokenExpired_throwIllegalArgument() {
         UserDetails userDetails =
                 User.withUsername("tester@example.com").password("password").roles("USER").build();
 

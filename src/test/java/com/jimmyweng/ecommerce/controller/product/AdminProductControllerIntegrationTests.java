@@ -65,7 +65,7 @@ class AdminProductControllerIntegrationTests {
     }
 
     @Test
-    void create_product_returns_created_response() throws Exception {
+    void createProduct_whenPayloadValid_returnCreatedResponse() throws Exception {
         String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
         CreateProductRequest request =
                 new CreateProductRequest(
@@ -92,7 +92,7 @@ class AdminProductControllerIntegrationTests {
     }
 
     @Test
-    void create_product_with_invalid_payload_returns_bad_request() throws Exception {
+    void createProduct_whenPayloadInvalid_returnBadRequest() throws Exception {
         String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
         CreateProductRequest request =
                 new CreateProductRequest(
@@ -113,7 +113,7 @@ class AdminProductControllerIntegrationTests {
 
 
     @Test
-    void update_product_returns_updated_payload() throws Exception {
+    void updateProduct_whenPayloadValid_returnUpdatedResponse() throws Exception {
         String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
         Product saved = productRepository.saveAndFlush(
                 new Product(
@@ -154,7 +154,7 @@ class AdminProductControllerIntegrationTests {
     }
 
     @Test
-    void update_nonexistent_product_returns_not_found() throws Exception {
+    void updateProduct_whenTargetMissing_returnNotFound() throws Exception {
         String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
         UpdateProductRequest request =
                 new UpdateProductRequest("Missing",
@@ -174,7 +174,7 @@ class AdminProductControllerIntegrationTests {
     }
 
     @Test
-    void update_product_with_stale_version_returns_conflict() throws Exception {
+    void updateProduct_whenVersionStale_returnConflict() throws Exception {
         String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
         Product saved = productRepository.saveAndFlush(
                 new Product(
@@ -213,7 +213,7 @@ class AdminProductControllerIntegrationTests {
     }
 
     @Test
-    void delete_product_marks_soft_delete() throws Exception {
+    void deleteProduct_whenAdminAuthorized_markSoftDeleted() throws Exception {
         String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
         Product saved = productRepository.saveAndFlush(
                 new Product(
@@ -234,7 +234,7 @@ class AdminProductControllerIntegrationTests {
     }
 
     @Test
-    void delete_product_with_non_admin_should_be_forbidden() throws Exception {
+    void deleteProduct_whenUserNotAdmin_returnForbidden() throws Exception {
         Product saved = productRepository.saveAndFlush(
                 new Product(
                         "Protected",

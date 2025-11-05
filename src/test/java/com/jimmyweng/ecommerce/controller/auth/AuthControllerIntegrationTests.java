@@ -1,6 +1,7 @@
 package com.jimmyweng.ecommerce.controller.auth;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -50,7 +51,7 @@ class AuthControllerIntegrationTests {
     }
 
     @Test
-    void login_shouldReturnJwtToken() throws Exception {
+    void login_whenCredentialsValid_returnJwtToken() throws Exception {
         String payload =
                 objectMapper.writeValueAsString(new LoginRequest("customer@example.com", "password"));
 
@@ -68,11 +69,13 @@ class AuthControllerIntegrationTests {
                 .getContentAsString();
 
         ApiResponseEnvelope apiResponseEnvelope = objectMapper.readValue(response, ApiResponseEnvelope.class);
-        assertThat((((Map<String, String>) apiResponseEnvelope.data()).get("token"))).isNotBlank();
+        String token = ((Map<String, String>) apiResponseEnvelope.data()).get("token");
+        assertNotNull(token);
+        assertFalse(token.isBlank());
     }
 
     @Test
-    void login_withInvalidCredentials_shouldReturnUnauthorized() throws Exception {
+    void login_whenCredentialsInvalid_returnUnauthorized() throws Exception {
         String payload =
                 objectMapper.writeValueAsString(new LoginRequest("customer@example.com", "wrong"));
 

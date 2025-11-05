@@ -1,7 +1,7 @@
 package com.jimmyweng.ecommerce.controller.order;
 
 import static com.jimmyweng.ecommerce.constant.ErrorMessages.outOfStock;
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -62,7 +62,7 @@ class OrderControllerIntegrationTests {
     }
 
     @Test
-    void create_order_decrements_stock_and_persists_items() throws Exception {
+    void createOrder_whenInventorySufficient_persistOrderAndAdjustStock() throws Exception {
         Product product = productRepository.save(
                 new Product("Board Game", "Co-op adventure", "games", new BigDecimal("79.99"), 10));
 
@@ -82,14 +82,14 @@ class OrderControllerIntegrationTests {
                 .andExpect(jsonPath("$.meta.timestamp").exists());
 
         Product updated = productRepository.findById(product.getId()).orElseThrow();
-        assertThat(updated.getStock()).isEqualTo(8);
-        assertThat(orderRepository.count()).isEqualTo(1);
+        assertEquals(8, updated.getStock());
+        assertEquals(1, orderRepository.count());
         Order order = orderRepository.findAll().getFirst();
-        assertThat(order.getItems()).hasSize(1);
+        assertEquals(1, order.getItems().size());
     }
 
     @Test
-    void create_order_returns_conflict_when_stock_insufficient() throws Exception {
+    void createOrder_whenStockInsufficient_returnConflict() throws Exception {
         Product product = productRepository.save(
                 new Product("Limited Edition", "Rare", "collectibles", new BigDecimal("100.00"), 1));
 
@@ -108,7 +108,7 @@ class OrderControllerIntegrationTests {
     }
 
     @Test
-    void create_order_is_idempotent() throws Exception {
+    void createOrder_whenIdempotencyKeyReused_returnExistingOrder() throws Exception {
         Product product = productRepository.save(
                 new Product("Miniatures", "Bundle", "games", new BigDecimal("50.00"), 5));
 
@@ -132,13 +132,13 @@ class OrderControllerIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ret_code").value(0));
 
-        assertThat(orderRepository.count()).isEqualTo(1);
+        assertEquals(1, orderRepository.count());
         Product updated = productRepository.findById(product.getId()).orElseThrow();
-        assertThat(updated.getStock()).isEqualTo(4);
+        assertEquals(4, updated.getStock());
     }
 
     @Test
-    void unordered_multi_product_orders_from_different_users_complete_without_deadlock() throws Exception {
+    void createOrder_whenDifferentUsersSubmitUnorderedItems_shouldNotCauseDeadLock() throws Exception {
         Product firstProduct = productRepository.save(
                 new Product("Desk Lamp", "Modern", "home", new BigDecimal("39.99"), 5));
         Product secondProduct = productRepository.save(
@@ -181,9 +181,9 @@ class OrderControllerIntegrationTests {
 
         Product firstUpdated = productRepository.findById(firstProduct.getId()).orElseThrow();
         Product secondUpdated = productRepository.findById(secondProduct.getId()).orElseThrow();
-        assertThat(firstUpdated.getStock()).isEqualTo(3);
-        assertThat(secondUpdated.getStock()).isEqualTo(3);
-        assertThat(orderRepository.count()).isEqualTo(2);
+        assertEquals(3, firstUpdated.getStock());
+        assertEquals(3, secondUpdated.getStock());
+        assertEquals(2, orderRepository.count());
     }
 
     private String obtainToken(String email, String password) throws Exception {
