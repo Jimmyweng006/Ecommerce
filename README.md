@@ -54,6 +54,7 @@ The API is documented with OpenAPI 3 via springdoc-openapi:
   - `DELETE /api/v1/admin/products/{productId}` – Soft-delete a product (requires `ROLE_ADMIN`).
 - **Orders**
   - `POST /api/v1/orders` – Create an order for the authenticated user with atomic stock decrement (requires `ROLE_USER`).
+  - `GET /api/v1/orders/{orderId}` – Retrieve order details (owner or `ROLE_ADMIN` only).
 - **Products**
   - `GET /api/v1/products` – Browse active products with pagination, category filter, and keyword search (public).
   - `GET /api/v1/products/{productId}` – Retrieve a specific product's details (public).

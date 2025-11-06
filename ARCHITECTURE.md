@@ -289,3 +289,39 @@ sequenceDiagram
         ProductsApi-->>Visitor: 404 Not Found (ret_code -1)
     end
 ```
+
+## Order Details Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Security as Security Filter Chain
+    participant OrdersApi as OrderController
+    participant Service as OrderQueryService
+    participant Repo as OrderRepository
+
+    User->>Security: GET /api/v1/orders/{orderId} (Bearer JWT)
+    Security->>Security: Validate JWT & USER role (ADMIN may have elevated access)
+    alt Unauthorized
+        Security-->>User: 401/403 error envelope
+    else Authorized
+        Security->>OrdersApi: Forward request with authenticated principal
+        OrdersApi->>Service: getOrderForUser(orderId, principal)
+        Service->>Repo: findById(orderId)
+        alt Order found
+            Repo-->>Service: Order entity
+            Service->>Service: verify ownership or admin role
+            alt Owner or Admin
+                Service-->>OrdersApi: Order DTO
+                OrdersApi-->>User: 200 OK with order details
+            else Not owner
+                Service-->>OrdersApi: throw ResourceNotFoundException (hide existence)
+                OrdersApi-->>User: 404 Not Found (ret_code -1)
+            end
+        else Order missing
+            Repo-->>Service: empty
+            Service-->>OrdersApi: throw ResourceNotFoundException
+            OrdersApi-->>User: 404 Not Found
+        end
+    end
+```

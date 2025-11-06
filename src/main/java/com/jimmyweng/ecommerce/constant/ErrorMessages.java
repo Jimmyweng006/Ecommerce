@@ -13,6 +13,7 @@ public final class ErrorMessages {
     private static final String PRODUCT_NOT_FOUND_PREFIX = "Product not found: ";
     private static final String OUT_OF_STOCK_PREFIX = "Product out of stock: ";
     private static final String USER_NOT_FOUND_PREFIX = "User not found: ";
+    private static final String ORDER_NOT_FOUND_PREFIX = "Order not found: ";
 
     public static String productNotFound(long productId) {
         return PRODUCT_NOT_FOUND_PREFIX + productId;
@@ -24,5 +25,9 @@ public final class ErrorMessages {
 
     public static String userNotFound(String email) {
         return USER_NOT_FOUND_PREFIX + email;
+    }
+
+    public static String orderNotFound(long orderId) {
+        return ORDER_NOT_FOUND_PREFIX + orderId;
     }
 }

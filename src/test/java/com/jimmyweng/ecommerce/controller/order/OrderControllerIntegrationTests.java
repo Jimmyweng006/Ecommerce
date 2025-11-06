@@ -2,24 +2,30 @@ package com.jimmyweng.ecommerce.controller.order;
 
 import static com.jimmyweng.ecommerce.constant.ErrorMessages.outOfStock;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jimmyweng.ecommerce.constant.ErrorMessages;
 import com.jimmyweng.ecommerce.constant.Role;
 import com.jimmyweng.ecommerce.controller.auth.dto.LoginRequest;
 import com.jimmyweng.ecommerce.controller.common.ApiResponseEnvelope;
 import com.jimmyweng.ecommerce.model.User;
 import com.jimmyweng.ecommerce.model.order.Order;
+import com.jimmyweng.ecommerce.model.order.OrderItem;
+import com.jimmyweng.ecommerce.constant.OrderStatus;
 import com.jimmyweng.ecommerce.model.product.Product;
 import com.jimmyweng.ecommerce.repository.UserRepository;
 import com.jimmyweng.ecommerce.repository.order.OrderRepository;
 import com.jimmyweng.ecommerce.repository.product.ProductRepository;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,10 +61,12 @@ class OrderControllerIntegrationTests {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    private User defaultCustomer;
+
     @BeforeEach
     void setUp() {
-        User user = new User("customer@example.com", passwordEncoder.encode("password"), Role.USER);
-        userRepository.save(user);
+        defaultCustomer = userRepository.save(new User("customer@example.com",
+                passwordEncoder.encode("password"), Role.USER));
     }
 
     @Test
@@ -154,16 +162,16 @@ class OrderControllerIntegrationTests {
         String firstOrderPayload = objectMapper.writeValueAsString(Map.of(
                 "idempotencyKey", UUID.randomUUID().toString(),
                 "items",
-                        List.of(
-                                Map.of("productId", firstProduct.getId(), "quantity", 1),
-                                Map.of("productId", secondProduct.getId(), "quantity", 1))));
+                List.of(
+                        Map.of("productId", firstProduct.getId(), "quantity", 1),
+                        Map.of("productId", secondProduct.getId(), "quantity", 1))));
 
         String secondOrderPayload = objectMapper.writeValueAsString(Map.of(
                 "idempotencyKey", UUID.randomUUID().toString(),
                 "items",
-                        List.of(
-                                Map.of("productId", secondProduct.getId(), "quantity", 1),
-                                Map.of("productId", firstProduct.getId(), "quantity", 1))));
+                List.of(
+                        Map.of("productId", secondProduct.getId(), "quantity", 1),
+                        Map.of("productId", firstProduct.getId(), "quantity", 1))));
 
         mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -186,6 +194,69 @@ class OrderControllerIntegrationTests {
         assertEquals(2, orderRepository.count());
     }
 
+    @Test
+    void getOrder_whenOwnerRequests_returnsOrderDetails() throws Exception {
+        Product product = productRepository.save(
+                new Product("Collector Item", "Owner view", "collectibles", new BigDecimal("149.99"), 2));
+        Order order = createOrder(defaultCustomer, product, 1, "owner-key");
+
+        String token = obtainToken(defaultCustomer.getEmail(), "password");
+
+        mockMvc.perform(get("/api/v1/orders/{orderId}", order.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ret_code").value(0))
+                .andExpect(jsonPath("$.data.id").value(order.getId()))
+                .andExpect(jsonPath("$.data.items[0].productId").value(product.getId()));
+    }
+
+    @Test
+    void getOrder_whenAdminRequestsAnotherUserOrder_returnsOrderDetails() throws Exception {
+        Product product = productRepository.save(
+                new Product("Admin View", "Admin access", "misc", new BigDecimal("59.99"), 3));
+        Order order = createOrder(defaultCustomer, product, 2, "admin-key");
+
+        User admin =
+                userRepository.save(new User("admin@example.com", passwordEncoder.encode("password"), Role.ADMIN));
+
+        String token = obtainToken(admin.getEmail(), "password");
+
+        mockMvc.perform(get("/api/v1/orders/{orderId}", order.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ret_code").value(0))
+                .andExpect(jsonPath("$.data.id").value(order.getId()))
+                .andExpect(jsonPath("$.data.items[0].productId").value(product.getId()));
+    }
+
+    @Test
+    void getOrder_whenDifferentUserRequests_returnsNotFound() throws Exception {
+        Product product = productRepository.save(
+                new Product("Protected", "Should hide", "misc", new BigDecimal("29.99"), 1));
+        Order order = createOrder(defaultCustomer, product, 1, "hidden-key");
+
+        User otherUser =
+                userRepository.save(new User("intruder@example.com", passwordEncoder.encode("password"), Role.USER));
+        String token = obtainToken(otherUser.getEmail(), "password");
+
+        mockMvc.perform(get("/api/v1/orders/{orderId}", order.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.ret_code").value(-1))
+                .andExpect(jsonPath("$.msg").value(ErrorMessages.orderNotFound(order.getId())));
+    }
+
+    @Test
+    void getOrder_whenOrderMissing_returnsNotFound() throws Exception {
+        String token = obtainToken(defaultCustomer.getEmail(), "password");
+
+        mockMvc.perform(get("/api/v1/orders/{orderId}", 9999L)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.ret_code").value(-1))
+                .andExpect(jsonPath("$.msg").value(ErrorMessages.orderNotFound(9999L)));
+    }
+
     private String obtainToken(String email, String password) throws Exception {
         String response = mockMvc
                 .perform(post("/api/v1/auth/login")
@@ -200,5 +271,13 @@ class OrderControllerIntegrationTests {
         @SuppressWarnings("unchecked")
         Map<String, String> data = (Map<String, String>) envelope.data();
         return data.get("token");
+    }
+
+    private Order createOrder(User owner, Product product, int quantity, String key) {
+        Order order = new Order(owner, OrderStatus.COMPLETED, key,
+                product.getPrice().multiply(BigDecimal.valueOf(quantity)));
+        order.addItem(new OrderItem(product, quantity, product.getPrice()));
+
+        return orderRepository.saveAndFlush(order);
     }
 }
