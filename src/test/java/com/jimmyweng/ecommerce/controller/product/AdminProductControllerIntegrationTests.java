@@ -1,5 +1,6 @@
 package com.jimmyweng.ecommerce.controller.product;
 
+import static com.jimmyweng.ecommerce.testsupport.TestAuthUtils.obtainToken;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,11 +10,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jimmyweng.ecommerce.constant.ErrorMessages;
 import com.jimmyweng.ecommerce.constant.Role;
-import com.jimmyweng.ecommerce.controller.auth.dto.LoginRequest;
 import com.jimmyweng.ecommerce.controller.product.dto.CreateProductRequest;
 import com.jimmyweng.ecommerce.controller.product.dto.UpdateProductRequest;
 import com.jimmyweng.ecommerce.model.User;
@@ -66,7 +65,7 @@ class AdminProductControllerIntegrationTests {
 
     @Test
     void createProduct_whenPayloadValid_returnCreatedResponse() throws Exception {
-        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String token = obtainToken(mockMvc, objectMapper, ADMIN_EMAIL, ADMIN_PASSWORD);
         CreateProductRequest request =
                 new CreateProductRequest(
                         "Board Game",
@@ -93,7 +92,7 @@ class AdminProductControllerIntegrationTests {
 
     @Test
     void createProduct_whenPayloadInvalid_returnBadRequest() throws Exception {
-        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String token = obtainToken(mockMvc, objectMapper, ADMIN_EMAIL, ADMIN_PASSWORD);
         CreateProductRequest request =
                 new CreateProductRequest(
                         "",
@@ -114,7 +113,7 @@ class AdminProductControllerIntegrationTests {
 
     @Test
     void updateProduct_whenPayloadValid_returnUpdatedResponse() throws Exception {
-        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String token = obtainToken(mockMvc, objectMapper, ADMIN_EMAIL, ADMIN_PASSWORD);
         Product saved = productRepository.saveAndFlush(
                 new Product(
                         "Old Title",
@@ -155,7 +154,7 @@ class AdminProductControllerIntegrationTests {
 
     @Test
     void updateProduct_whenTargetMissing_returnNotFound() throws Exception {
-        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String token = obtainToken(mockMvc, objectMapper, ADMIN_EMAIL, ADMIN_PASSWORD);
         UpdateProductRequest request =
                 new UpdateProductRequest("Missing",
                         "Will fail",
@@ -175,7 +174,7 @@ class AdminProductControllerIntegrationTests {
 
     @Test
     void updateProduct_whenVersionStale_returnConflict() throws Exception {
-        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String token = obtainToken(mockMvc, objectMapper, ADMIN_EMAIL, ADMIN_PASSWORD);
         Product saved = productRepository.saveAndFlush(
                 new Product(
                         "Hot Item",
@@ -214,7 +213,7 @@ class AdminProductControllerIntegrationTests {
 
     @Test
     void deleteProduct_whenAdminAuthorized_markSoftDeleted() throws Exception {
-        String token = obtainToken(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String token = obtainToken(mockMvc, objectMapper, ADMIN_EMAIL, ADMIN_PASSWORD);
         Product saved = productRepository.saveAndFlush(
                 new Product(
                         "Delete Me",
@@ -246,22 +245,11 @@ class AdminProductControllerIntegrationTests {
         User nonAdmin = new User(USER_EMAIL, passwordEncoder.encode(USER_PASSWORD), Role.USER);
         userRepository.saveAndFlush(nonAdmin);
 
-        String token = obtainToken(USER_EMAIL, USER_PASSWORD);
+        String token = obtainToken(mockMvc, objectMapper, USER_EMAIL, USER_PASSWORD);
 
         mockMvc.perform(delete("/api/v1/admin/products/{id}", saved.getId())
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden());
     }
 
-    private String obtainToken(String email, String password) throws Exception {
-        JsonNode response = objectMapper.readTree(mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new LoginRequest(email, password))))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString());
-        return response.get("data").get("token").asText();
-    }
 }

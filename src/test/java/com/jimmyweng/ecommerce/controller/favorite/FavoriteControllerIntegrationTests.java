@@ -1,5 +1,6 @@
 package com.jimmyweng.ecommerce.controller.favorite;
 
+import static com.jimmyweng.ecommerce.testsupport.TestAuthUtils.obtainToken;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -8,11 +9,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jimmyweng.ecommerce.constant.ErrorMessages;
 import com.jimmyweng.ecommerce.constant.Role;
-import com.jimmyweng.ecommerce.controller.auth.dto.LoginRequest;
 import com.jimmyweng.ecommerce.controller.favorite.dto.AddFavoriteRequest;
 import com.jimmyweng.ecommerce.model.User;
 import com.jimmyweng.ecommerce.model.favorite.Favorite;
@@ -75,7 +74,7 @@ class FavoriteControllerIntegrationTests {
         Product product = productRepository.save(
                 new Product("Tower Defence", "Fun strategy", "games", new BigDecimal("19.99"), 10));
 
-        String token = obtainToken(USER_EMAIL, USER_PASSWORD);
+        String token = obtainToken(mockMvc, objectMapper, USER_EMAIL, USER_PASSWORD);
         AddFavoriteRequest request = new AddFavoriteRequest(product.getId());
 
         mockMvc.perform(post("/api/v1/favorites")
@@ -96,7 +95,7 @@ class FavoriteControllerIntegrationTests {
                 new Product("Board Game", "Co-op adventure", "games", new BigDecimal("59.99"), 5));
         favoriteRepository.save(new Favorite(userId, product.getId(), Instant.now()));
 
-        String token = obtainToken(USER_EMAIL, USER_PASSWORD);
+        String token = obtainToken(mockMvc, objectMapper, USER_EMAIL, USER_PASSWORD);
         AddFavoriteRequest request = new AddFavoriteRequest(product.getId());
 
         mockMvc.perform(post("/api/v1/favorites")
@@ -121,7 +120,7 @@ class FavoriteControllerIntegrationTests {
         favoriteRepository.save(new Favorite(userId, earlier.getId(), Instant.now().minusSeconds(10)));
         favoriteRepository.save(new Favorite(userId, latest.getId(), Instant.now()));
 
-        String token = obtainToken(USER_EMAIL, USER_PASSWORD);
+        String token = obtainToken(mockMvc, objectMapper, USER_EMAIL, USER_PASSWORD);
 
         mockMvc.perform(get("/api/v1/favorites")
                         .header("Authorization", "Bearer " + token))
@@ -133,7 +132,7 @@ class FavoriteControllerIntegrationTests {
 
     @Test
     void addFavorite_whenProductMissing_returnNotFound() throws Exception {
-        String token = obtainToken(USER_EMAIL, USER_PASSWORD);
+        String token = obtainToken(mockMvc, objectMapper, USER_EMAIL, USER_PASSWORD);
         AddFavoriteRequest request = new AddFavoriteRequest(9999L);
 
         mockMvc.perform(post("/api/v1/favorites")
@@ -151,7 +150,7 @@ class FavoriteControllerIntegrationTests {
                 new Product("Accessory", "Must have", "gadgets", new BigDecimal("9.99"), 15));
         favoriteRepository.save(new Favorite(userId, product.getId(), Instant.now()));
 
-        String token = obtainToken(USER_EMAIL, USER_PASSWORD);
+        String token = obtainToken(mockMvc, objectMapper, USER_EMAIL, USER_PASSWORD);
 
         mockMvc.perform(delete("/api/v1/favorites/{productId}", product.getId())
                         .header("Authorization", "Bearer " + token))
@@ -160,15 +159,4 @@ class FavoriteControllerIntegrationTests {
         assertTrue(favoriteRepository.findAllByIdUserIdOrderByCreatedAtDesc(userId).isEmpty());
     }
 
-    private String obtainToken(String email, String password) throws Exception {
-        JsonNode response = objectMapper.readTree(mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new LoginRequest(email, password))))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString());
-        return response.get("data").get("token").asText();
-    }
 }
