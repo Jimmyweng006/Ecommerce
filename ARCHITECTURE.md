@@ -245,3 +245,47 @@ sequenceDiagram
         end
     end
 ```
+
+## Product Browsing Flow
+
+```mermaid
+sequenceDiagram
+    participant Visitor
+    participant Security as Security Filter Chain
+    participant ProductsApi as ProductController
+    participant Service as ProductQueryService
+    participant Repo as ProductRepository
+
+    Visitor->>Security: GET /api/v1/products?page=0&size=20&category=games (Bearer JWT optional)
+    Security->>ProductsApi: Forward request (principal optional)
+    ProductsApi->>Service: listProducts(filters, pagination)
+    Service->>Repo: fetch active products with filter + pageable
+    Repo-->>Service: Page<Product>
+    Service-->>ProductsApi: Paged result + metadata
+    ProductsApi-->>Visitor: 200 OK (ret_code 0, data contains items + page meta)
+```
+
+## Product Details Flow
+
+```mermaid
+sequenceDiagram
+    participant Visitor
+    participant Security as Security Filter Chain
+    participant ProductsApi as ProductController
+    participant Service as ProductQueryService
+    participant Repo as ProductRepository
+
+    Visitor->>Security: GET /api/v1/products/{productId} (Bearer JWT optional)
+    Security->>ProductsApi: Forward request (principal optional)
+    ProductsApi->>Service: getProduct(productId)
+    Service->>Repo: findByIdAndDeletedAtIsNull(productId)
+    alt Product found
+        Repo-->>Service: Product
+        Service-->>ProductsApi: Product DTO
+        ProductsApi-->>Visitor: 200 OK with product payload
+    else Not found or deleted
+        Repo-->>Service: empty
+        Service-->>ProductsApi: throw ResourceNotFoundException
+        ProductsApi-->>Visitor: 404 Not Found (ret_code -1)
+    end
+```
