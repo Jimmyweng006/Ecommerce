@@ -27,13 +27,15 @@ services:
       db:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: docker,load-test
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/ecommerce?createDatabaseIfNotExist=true&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
       SPRING_DATASOURCE_USERNAME: ecommerce
       SPRING_DATASOURCE_PASSWORD: ecommerce
       SPRING_LIQUIBASE_URL: jdbc:mysql://db:3306/ecommerce?createDatabaseIfNotExist=true&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
       SPRING_LIQUIBASE_USER: ecommerce
       SPRING_LIQUIBASE_PASSWORD: ecommerce
+      LOAD_TEST_SEED_COUNT: 10000
+      LOAD_TEST_BATCH_SIZE: 500
     ports:
       - "8080:8080"
     restart: unless-stopped

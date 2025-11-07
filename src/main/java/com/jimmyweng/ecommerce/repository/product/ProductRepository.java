@@ -34,4 +34,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             """)
     Page<Product> searchActiveProducts(
             @Param("category") String category, @Param("keyword") String keyword, Pageable pageable);
+
+    void deleteByTitleStartingWith(String titlePrefix);
 }
