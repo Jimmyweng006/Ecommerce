@@ -2,19 +2,29 @@
 
 This folder will host k6 scripts for exercising the most critical flows. Each scenario below documents its purpose, traffic pattern, success criteria, and potential remediation steps.
 
+## Back of the envelope estimation
+
+Assumption: 10 million DAU, with peak traffic 2x average, 500k products
+Traffic Breakdown: read(browsing/searching): 80%, write(checkout): 20%
+
+Read QPS Calculation:
+
+10M users/day * 10 times views/user = 100M views/day
+100M / (24 * 60 * 60) ~= 1150 QPS
+Peak QPS = 1150 * 2 = 2300 QPS
+
 ## Scenarios
 
-Enable the load-test profile to seed synthetic products before running k6: SPRING_PROFILES_ACTIVE=docker,load-test
-
-Seed count defaults to 10000
-
-Use `LOAD_TEST_SEED_COUNT`, `LOAD_TEST_BATCH_SIZE` to override
+> Enable the load-test profile to seed synthetic products before running k6: `SPRING_PROFILES_ACTIVE=docker,load-test`  
+> Seed count defaults to 10,000（可透過 `LOAD_TEST_SEED_COUNT` 覆寫，`LOAD_TEST_BATCH_SIZE` 控制批次大小）
 
 ### 1. Product Browsing Surge
 - **Purpose**: Validate `/api/v1/products` (pagination + keyword filter) under marketing spikes to ensure the DB/cache layer absorbs high RPS without latency spikes.
-- **Environment baseline**: Docker Desktop (Linux) with 12 vCPU / 7.65 GiB RAM, `SPRING_PROFILES_ACTIVE=docker,load-test`, seed count 10k products.
-- **Traffic shape**: `constant-arrival-rate` targeting 1000 req/s for 1 min (preallocated VUs: 600, max VUs: 2000).
-- **Current baseline**: ~690 req/s, P95 ≈ 3.2 s, dropped iterations once 2000 VUs are reached → indicates server latency bottleneck.
+- **Environment baseline**: Docker Desktop (Linux) with 12 vCPU / 7.65 GiB RAM, `SPRING_PROFILES_ACTIVE=docker,load-test`, seed count 500k products.  
+  - Local run + docker stats: `CONTAINERS="ecommerce-app ecommerce-db" ./scripts/loadtest_with_stats.sh k6 run load-test/products-browse.js`
+  - k6 Cloud local execution: `k6 cloud run --local-execution load-test/products-browse.js`
+- **Traffic shape**: `constant-arrival-rate` targeting 1000 req/s for 1 min.  
+  - k6 Cloud local execution（max VUs 100、500k products）：~16 req/s, P95 ≈ 6 s（明顯瓶頸）
 - **Success criteria**:
   - P95 latency < 300 ms
   - Error rate (HTTP != 200) < 1%

@@ -6,8 +6,8 @@ const CATEGORIES = ['games', 'books', 'collectibles', 'gadgets', "home", null];
 const KEYWORDS = ['board', 'space', 'retro', 'limited', 'flash', 'sale', 'top', null];
 
 const REQ_RATE = Number(__ENV.K6_REQ_RATE || 1000); // requests per second
-const PRE_ALLOCATED_VUS = Number(__ENV.K6_VUS || 600);
-const MAX_VUS = Number(__ENV.K6_MAX_VUS || 2000);
+const PRE_ALLOCATED_VUS = Number(__ENV.K6_VUS || 50);
+const MAX_VUS = Number(__ENV.K6_MAX_VUS || 100);
 
 export const options = {
   scenarios: {
@@ -20,6 +20,10 @@ export const options = {
       maxVUs: MAX_VUS,
     },
   },
+  cloud: {
+    projectID: 5505295,
+    name: "Ecommerce"
+  }
 };
 
 function randomItem(arr) {
