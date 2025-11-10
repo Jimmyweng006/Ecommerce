@@ -31,8 +31,28 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
               and (:keyword is null or
                    lower(p.title) like lower(concat('%', :keyword, '%')) or
                    lower(coalesce(p.description, '')) like lower(concat('%', :keyword, '%')))
+            order by p.createdAt desc
             """)
-    Page<Product> searchActiveProducts(
+    Page<Product> searchActiveProductsLike(
+            @Param("category") String category, @Param("keyword") String keyword, Pageable pageable);
+
+    @Query(
+            value = """
+                    select p.*
+                    from products p
+                    where p.deleted_at is null
+                      and (:category is null or lower(p.category) = lower(:category))
+                      and match(p.title, p.description) against (:keyword in natural language mode)
+                    order by p.created_at desc
+                    """,
+            countQuery = """
+                    select count(*) from products p
+                    where p.deleted_at is null
+                      and (:category is null or lower(p.category) = lower(:category))
+                      and match(p.title, p.description) against (:keyword in natural language mode)
+                    """,
+            nativeQuery = true)
+    Page<Product> searchActiveProductsFullText(
             @Param("category") String category, @Param("keyword") String keyword, Pageable pageable);
 
     void deleteByTitleStartingWith(String titlePrefix);

@@ -6,6 +6,7 @@ import com.jimmyweng.ecommerce.model.product.Product;
 import com.jimmyweng.ecommerce.repository.product.ProductRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -15,15 +16,30 @@ import org.springframework.util.StringUtils;
 public class ProductQueryService {
 
     private final ProductRepository productRepository;
+    private final boolean fullTextEnabled;
+    private final int fullTextMinLength;
 
-    public ProductQueryService(ProductRepository productRepository) {
+    public ProductQueryService(
+            ProductRepository productRepository,
+            @Value("${feature.fulltext.enabled:true}") boolean fullTextEnabled,
+            @Value("${feature.fulltext.min-length:3}") int fullTextMinLength) {
         this.productRepository = productRepository;
+        this.fullTextEnabled = fullTextEnabled;
+        this.fullTextMinLength = fullTextMinLength;
     }
 
     public Page<Product> listProducts(String category, String keyword, Pageable pageable) {
         String normalizedCategory = StringUtils.hasText(category) ? category.trim() : null;
         String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim() : null;
-        return productRepository.searchActiveProducts(normalizedCategory, normalizedKeyword, pageable);
+
+        boolean useFullText = fullTextEnabled
+                && StringUtils.hasText(normalizedKeyword)
+                && normalizedKeyword.length() >= fullTextMinLength;
+        if (useFullText) {
+            return productRepository.searchActiveProductsFullText(normalizedCategory, normalizedKeyword, pageable);
+        }
+
+        return productRepository.searchActiveProductsLike(normalizedCategory, normalizedKeyword, pageable);
     }
 
     public Product getProduct(Long productId) {

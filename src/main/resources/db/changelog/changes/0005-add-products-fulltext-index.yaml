@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0005-add-products-fulltext-index
+      author: codex
+      changes:
+        - sql:
+            dbms: mysql
+            sql: |
+              CREATE FULLTEXT INDEX idx_products_title_description_fulltext
+              ON products(title, description);
+      rollback:
+        - sql:
+            dbms: mysql
+            sql: |
+              DROP INDEX idx_products_title_description_fulltext ON products;

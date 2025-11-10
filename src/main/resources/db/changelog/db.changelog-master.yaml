@@ -17,3 +17,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/0004-add-unique-users-email.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/0005-add-products-fulltext-index.yaml
+      relativeToChangelogFile: false

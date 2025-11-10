@@ -3,6 +3,7 @@ services:
     image: mysql:8.4
     container_name: ecommerce-db
     restart: unless-stopped
+    command: --max_connections=300
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: ecommerce

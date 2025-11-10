@@ -59,7 +59,7 @@ public class ProductController {
             @Parameter(description = "Keyword search across title and description")
                     @RequestParam(name = "search", required = false)
                     String keyword) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable pageable = PageRequest.of(page, size);
         Page<Product> pageResult = productQueryService.listProducts(category, keyword, pageable);
 
         return ProductListResponse.from(pageResult);
