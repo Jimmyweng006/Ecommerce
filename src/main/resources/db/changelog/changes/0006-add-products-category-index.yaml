@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0006-add-products-category-index
+      author: codex
+      changes:
+        - sql:
+            dbms: mysql
+            sql: |
+              UPDATE products SET category = LOWER(category);
+        - createIndex:
+            indexName: idx_products_category
+            tableName: products
+            columns:
+              - column:
+                  name: category
+      rollback:
+        - dropIndex:
+            indexName: idx_products_category
+            tableName: products

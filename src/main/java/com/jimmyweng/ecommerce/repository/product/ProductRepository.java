@@ -27,7 +27,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("""
             select p from Product p
             where p.deletedAt is null
-              and (:category is null or lower(p.category) = lower(:category))
+              and (:category is null or p.category = :category)
               and (:keyword is null or
                    lower(p.title) like lower(concat('%', :keyword, '%')) or
                    lower(coalesce(p.description, '')) like lower(concat('%', :keyword, '%')))
@@ -41,14 +41,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                     select p.*
                     from products p
                     where p.deleted_at is null
-                      and (:category is null or lower(p.category) = lower(:category))
+                      and (:category is null or p.category = :category)
                       and match(p.title, p.description) against (:keyword in natural language mode)
                     order by p.created_at desc
                     """,
             countQuery = """
                     select count(*) from products p
                     where p.deleted_at is null
-                      and (:category is null or lower(p.category) = lower(:category))
+                      and (:category is null or p.category = :category)
                       and match(p.title, p.description) against (:keyword in natural language mode)
                     """,
             nativeQuery = true)

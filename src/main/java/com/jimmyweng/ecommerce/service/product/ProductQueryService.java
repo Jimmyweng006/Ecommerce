@@ -4,9 +4,10 @@ import com.jimmyweng.ecommerce.constant.ErrorMessages;
 import com.jimmyweng.ecommerce.exception.ResourceNotFoundException;
 import com.jimmyweng.ecommerce.model.product.Product;
 import com.jimmyweng.ecommerce.repository.product.ProductRepository;
+import java.util.Locale;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -29,7 +30,7 @@ public class ProductQueryService {
     }
 
     public Page<Product> listProducts(String category, String keyword, Pageable pageable) {
-        String normalizedCategory = StringUtils.hasText(category) ? category.trim() : null;
+        String normalizedCategory = StringUtils.hasText(category) ? category.trim().toLowerCase(Locale.ROOT) : null;
         String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim() : null;
 
         boolean useFullText = fullTextEnabled

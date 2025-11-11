@@ -20,3 +20,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/0005-add-products-fulltext-index.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/0006-add-products-category-index.yaml
+      relativeToChangelogFile: false

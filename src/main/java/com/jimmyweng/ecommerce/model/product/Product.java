@@ -9,12 +9,12 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.Locale;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.math.BigDecimal;
-import java.time.Instant;
 
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
@@ -57,7 +57,7 @@ public class Product {
     public Product(String title, String description, String category, BigDecimal price, Integer stock) {
         this.title = title;
         this.description = description;
-        this.category = category;
+        this.category = normalizeCategory(category);
         this.price = price;
         this.stock = stock;
     }
@@ -65,7 +65,7 @@ public class Product {
     public void applyUpdate(String title, String description, String category, BigDecimal price, Integer stock) {
         this.title = title;
         this.description = description;
-        this.category = category;
+        this.category = normalizeCategory(category);
         this.price = price;
         this.stock = stock;
     }
@@ -79,10 +79,16 @@ public class Product {
         Instant now = Instant.now();
         this.createdAt = now;
         this.updatedAt = now;
+        this.category = normalizeCategory(this.category);
     }
 
     @PreUpdate
     void onUpdate() {
         this.updatedAt = Instant.now();
+        this.category = normalizeCategory(this.category);
+    }
+
+    private static String normalizeCategory(String category) {
+        return category == null ? null : category.trim().toLowerCase(Locale.ROOT);
     }
 }
