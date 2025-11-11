@@ -24,7 +24,9 @@ CREATE TABLE products (
     stock INT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL
+    deleted_at TIMESTAMP NULL,
+    FULLTEXT KEY idx_products_title_description_fulltext (title, description),
+    KEY idx_products_category (category)
 ) ENGINE = InnoDB;
 
 CREATE TABLE orders (
