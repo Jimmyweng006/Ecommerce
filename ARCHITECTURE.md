@@ -71,6 +71,12 @@ CREATE TABLE favorites (
 ) ENGINE = InnoDB;
 ```
 
+## Read/Write Separation
+
+- Docker Compose provisions one MySQL primary plus three asynchronous replicas. Writes, Liquibase migrations, and any `@ReadFromPrimary` operations target the primary.
+- Spring Boot registers a custom `AbstractRoutingDataSource` (`ReadReplicaRoutingDataSource`) that checks `TransactionSynchronizationManager.isCurrentTransactionReadOnly()` and round-robins queries across the configured replicas. If no replica is configured or a request enforces primary routing, it falls back automatically.
+- Services that require strongly consistent reads (e.g., `OrderQueryService`) annotate with `@ReadFromPrimary`, which flips a ThreadLocal flag through an aspect so even read-only transactions hit the primary.
+
 ## Authentication Flow
 
 The diagram below illustrates how Spring Security mediates requests, checking credentials on login and validating JWTs on subsequent calls before delegating to application controllers.

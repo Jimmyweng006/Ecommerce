@@ -20,6 +20,7 @@ Export or configure the following environment variables when overriding defaults
 | `SECURITY_JWT_EXPIRY_SECONDS` | Token lifetime in seconds | `3600` |
 | `SPRING_DATASOURCE_URL` | JDBC URL for the primary database | `jdbc:mysql://localhost:3306/ecommerce?...` |
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | Database credentials | `root` / `rootpassword` |
+| `APP_READ_REPLICA_<N>_URL` / `_USERNAME` / `_PASSWORD` | Optional read-only JDBC endpoints (used for read routing) | unset |
 
 ### Run with Docker Compose
 
@@ -27,13 +28,13 @@ Export or configure the following environment variables when overriding defaults
 docker compose up --build
 ```
 
-This starts a local MySQL 8.4 container plus the Spring Boot application with the `docker` profile and matching datasource settings.
+This boots one MySQL primary plus three read-only replicas (official `mysql:8.0` images) along with the Spring Boot application using the `docker` profile. The primary picks up `docker/mysql/conf.d/primary.cnf` and `docker/mysql/initdb/primary/01-create-replication-user.sql`; replicas use `docker/mysql/conf.d/replica.cnf` together with `docker/mysql/initdb/replica/01-configure-replication.sh` to run `CHANGE REPLICATION SOURCE TO ... START REPLICA`. First launch may take ~1–2 minutes while Liquibase migrates and replicas catch up.
+
+Stop and clean all containers and volumes when finished:
 
 ```bash
 docker compose down -v
 ```
-
-Stop and clean all containers and volumes when finished.
 
 ## Run Book
 
@@ -62,6 +63,16 @@ The API is documented with OpenAPI 3 via springdoc-openapi:
   - `POST /api/v1/favorites` – Add a product to the authenticated user's favorites list (requires `ROLE_USER`).
   - `GET /api/v1/favorites` – Retrieve the authenticated user's favorite products in reverse chronological order.
   - `DELETE /api/v1/favorites/{productId}` – Remove a product from the favorites list (idempotent, requires `ROLE_USER`).
+
+### Read/Write Routing & Replication
+
+- The Spring Boot app uses a routing datasource: non-read-only transactions always hit the primary; `@Transactional(readOnly = true)` methods route round-robin across replicas unless they are annotated with `@ReadFromPrimary`.
+- Replica JDBC URLs are supplied via `app.read-replicas[n].*` (mapped from `APP_READ_REPLICA_*` environment variables in Docker Compose). Leave the URL empty to skip a slot.
+- Docker Compose wires replication through the files under `docker/mysql`:
+  - `conf.d/primary.cnf` enables binlogs, GTID, and raises `max_connections`.
+  - `initdb/primary/01-create-replication-user.sql` creates `repl_user`/`repl_password`.
+  - Each replica mounts `conf.d/replica.cnf` and `initdb/replica/01-configure-replication.sh`, which waits for the primary and executes `CHANGE REPLICATION SOURCE TO ... START REPLICA`.
+- Verify replica health with `docker exec -it ecommerce-db-replica-1 mysql -uroot -prootpassword -e "SHOW REPLICA STATUS\G"` (expect `Replica_IO_Running` and `Replica_SQL_Running` = Yes, `Seconds_Behind_Master` near 0).
 
 ## Test
 
@@ -98,3 +109,4 @@ Generates coverage reports under `target/site/jacoco/index.html`.
 ## Document
 
 - [Tech Design](ARCHITECTURE.md)
+- [Load Testing Experiment](EXPERIMENT.md)

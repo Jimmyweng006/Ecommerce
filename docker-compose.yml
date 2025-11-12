@@ -1,20 +1,109 @@
 services:
-  db:
-    image: mysql:8.4
-    container_name: ecommerce-db
+  db-primary:
+    image: mysql:8.0
+    container_name: ecommerce-db-primary
     restart: unless-stopped
-    command: --max_connections=300
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: ecommerce
       MYSQL_USER: ecommerce
       MYSQL_PASSWORD: ecommerce
+      MYSQL_ROOT_HOST: "%"
     ports:
       - "3306:3306"
     volumes:
-      - db_data:/var/lib/mysql
+      - db_primary_data:/var/lib/mysql
+      - ./docker/mysql/conf.d/primary.cnf:/etc/mysql/conf.d/primary.cnf:ro
+      - ./docker/mysql/initdb/primary:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -pecommerce"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  db-replica-1:
+    image: mysql:8.0
+    container_name: ecommerce-db-replica-1
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: ecommerce
+      MYSQL_USER: ecommerce
+      MYSQL_PASSWORD: ecommerce
+      MYSQL_ROOT_HOST: "%"
+      PRIMARY_HOST: db-primary
+      PRIMARY_PORT: 3306
+      MYSQL_REPLICATION_USER: repl_user
+      MYSQL_REPLICATION_PASSWORD: repl_password
+    command: ["mysqld", "--server-id=201"]
+    depends_on:
+      db-primary:
+        condition: service_healthy
+    volumes:
+      - db_replica1_data:/var/lib/mysql
+      - ./docker/mysql/conf.d/replica.cnf:/etc/mysql/conf.d/replica.cnf:ro
+      - ./docker/mysql/initdb/replica:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  db-replica-2:
+    image: mysql:8.0
+    container_name: ecommerce-db-replica-2
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: ecommerce
+      MYSQL_USER: ecommerce
+      MYSQL_PASSWORD: ecommerce
+      MYSQL_ROOT_HOST: "%"
+      PRIMARY_HOST: db-primary
+      PRIMARY_PORT: 3306
+      MYSQL_REPLICATION_USER: repl_user
+      MYSQL_REPLICATION_PASSWORD: repl_password
+    command: ["mysqld", "--server-id=202"]
+    depends_on:
+      db-primary:
+        condition: service_healthy
+    volumes:
+      - db_replica2_data:/var/lib/mysql
+      - ./docker/mysql/conf.d/replica.cnf:/etc/mysql/conf.d/replica.cnf:ro
+      - ./docker/mysql/initdb/replica:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  db-replica-3:
+    image: mysql:8.0
+    container_name: ecommerce-db-replica-3
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: ecommerce
+      MYSQL_USER: ecommerce
+      MYSQL_PASSWORD: ecommerce
+      MYSQL_ROOT_HOST: "%"
+      PRIMARY_HOST: db-primary
+      PRIMARY_PORT: 3306
+      MYSQL_REPLICATION_USER: repl_user
+      MYSQL_REPLICATION_PASSWORD: repl_password
+    command: ["mysqld", "--server-id=203"]
+    depends_on:
+      db-primary:
+        condition: service_healthy
+    volumes:
+      - db_replica3_data:/var/lib/mysql
+      - ./docker/mysql/conf.d/replica.cnf:/etc/mysql/conf.d/replica.cnf:ro
+      - ./docker/mysql/initdb/replica:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -prootpassword"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,16 +114,25 @@ services:
       context: .
     container_name: ecommerce-app
     depends_on:
-      db:
+      db-primary:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker,load-test
-      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/ecommerce?createDatabaseIfNotExist=true&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_URL: jdbc:mysql://db-primary:3306/ecommerce?createDatabaseIfNotExist=true&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
       SPRING_DATASOURCE_USERNAME: ecommerce
       SPRING_DATASOURCE_PASSWORD: ecommerce
-      SPRING_LIQUIBASE_URL: jdbc:mysql://db:3306/ecommerce?createDatabaseIfNotExist=true&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_LIQUIBASE_URL: jdbc:mysql://db-primary:3306/ecommerce?createDatabaseIfNotExist=true&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
       SPRING_LIQUIBASE_USER: ecommerce
       SPRING_LIQUIBASE_PASSWORD: ecommerce
+      APP_READ_REPLICA_1_URL: jdbc:mysql://db-replica-1:3306/ecommerce?serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+      APP_READ_REPLICA_1_USERNAME: ecommerce
+      APP_READ_REPLICA_1_PASSWORD: ecommerce
+      APP_READ_REPLICA_2_URL: jdbc:mysql://db-replica-2:3306/ecommerce?serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+      APP_READ_REPLICA_2_USERNAME: ecommerce
+      APP_READ_REPLICA_2_PASSWORD: ecommerce
+      APP_READ_REPLICA_3_URL: jdbc:mysql://db-replica-3:3306/ecommerce?serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+      APP_READ_REPLICA_3_USERNAME: ecommerce
+      APP_READ_REPLICA_3_PASSWORD: ecommerce
       LOAD_TEST_SEED_COUNT: 500000
       LOAD_TEST_BATCH_SIZE: 500
     ports:
@@ -42,4 +140,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  db_data:
+  db_primary_data:
+  db_replica1_data:
+  db_replica2_data:
+  db_replica3_data:

@@ -8,8 +8,11 @@ import com.jimmyweng.ecommerce.repository.order.OrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.jimmyweng.ecommerce.datasource.annotation.ReadFromPrimary;
+
 @Service
 @Transactional(readOnly = true)
+@ReadFromPrimary
 public class OrderQueryService {
 
     private final OrderRepository orderRepository;
