@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0007-add-products-softdelete-category-created-index
+      author: codex
+      changes:
+        - createIndex:
+            tableName: products
+            indexName: idx_products_deleted_category_created
+            columns:
+              - column:
+                  name: deleted_at
+              - column:
+                  name: category
+              - column:
+                  name: created_at
+      rollback:
+        - dropIndex:
+            tableName: products
+            indexName: idx_products_deleted_category_created

@@ -43,7 +43,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                     where p.deleted_at is null
                       and (:category is null or p.category = :category)
                       and match(p.title, p.description) against (:keyword in natural language mode)
-                    order by p.created_at desc
+                    order by match(p.title, p.description) against (:keyword in natural language mode) desc,
+                             p.created_at desc
                     """,
             nativeQuery = true)
     Slice<Product> searchActiveProductsFullText(

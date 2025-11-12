@@ -23,3 +23,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/0006-add-products-category-index.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/0007-add-products-softdelete-category-created-index.yaml
+      relativeToChangelogFile: false
