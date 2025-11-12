@@ -44,7 +44,8 @@ class ProductControllerIntegrationTests {
                 .andExpect(jsonPath("$.ret_code").value(0))
                 .andExpect(jsonPath("$.data.items.length()").value(2))
                 .andExpect(jsonPath("$.data.items[*].id").value(hasItems(newer.getId().intValue(), older.getId().intValue())))
-                .andExpect(jsonPath("$.data.pagination.totalElements").value(2));
+                .andExpect(jsonPath("$.data.pagination.numberOfElements").value(2))
+                .andExpect(jsonPath("$.data.pagination.hasNext").value(false));
     }
 
     @Test
@@ -62,7 +63,8 @@ class ProductControllerIntegrationTests {
                 .andExpect(jsonPath("$.data.items.length()").value(2))
                 .andExpect(jsonPath("$.data.items[0].category").value("books"))
                 .andExpect(jsonPath("$.data.items[1].category").value("books"))
-                .andExpect(jsonPath("$.data.pagination.totalElements").value(2));
+                .andExpect(jsonPath("$.data.pagination.numberOfElements").value(2))
+                .andExpect(jsonPath("$.data.pagination.hasNext").value(false));
     }
 
     @Test

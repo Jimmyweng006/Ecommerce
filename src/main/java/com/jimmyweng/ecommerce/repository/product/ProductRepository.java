@@ -4,8 +4,8 @@ import com.jimmyweng.ecommerce.model.product.Product;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -33,7 +33,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                    lower(coalesce(p.description, '')) like lower(concat('%', :keyword, '%')))
             order by p.createdAt desc
             """)
-    Page<Product> searchActiveProductsLike(
+    Slice<Product> searchActiveProductsLike(
             @Param("category") String category, @Param("keyword") String keyword, Pageable pageable);
 
     @Query(
@@ -45,14 +45,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                       and match(p.title, p.description) against (:keyword in natural language mode)
                     order by p.created_at desc
                     """,
-            countQuery = """
-                    select count(*) from products p
-                    where p.deleted_at is null
-                      and (:category is null or p.category = :category)
-                      and match(p.title, p.description) against (:keyword in natural language mode)
-                    """,
             nativeQuery = true)
-    Page<Product> searchActiveProductsFullText(
+    Slice<Product> searchActiveProductsFullText(
             @Param("category") String category, @Param("keyword") String keyword, Pageable pageable);
 
     void deleteByTitleStartingWith(String titlePrefix);

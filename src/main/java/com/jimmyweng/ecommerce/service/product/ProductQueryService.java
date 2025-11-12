@@ -8,8 +8,8 @@ import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -33,7 +33,7 @@ public class ProductQueryService {
         this.fullTextMinLength = fullTextMinLength;
     }
 
-    public Page<Product> listProducts(String category, String keyword, Pageable pageable) {
+    public Slice<Product> listProducts(String category, String keyword, Pageable pageable) {
         String normalizedCategory = StringUtils.hasText(category) ? category.trim().toLowerCase(Locale.ROOT) : null;
         String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim() : null;
 

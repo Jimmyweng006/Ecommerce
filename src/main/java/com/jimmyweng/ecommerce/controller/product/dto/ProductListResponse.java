@@ -2,21 +2,20 @@ package com.jimmyweng.ecommerce.controller.product.dto;
 
 import com.jimmyweng.ecommerce.model.product.Product;
 import java.util.List;
-import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 
-public record ProductListResponse(List<ProductResponse> items, PageMetadata pagination) {
+public record ProductListResponse(List<ProductResponse> items, SliceMetadata pagination) {
 
-    public static ProductListResponse from(Page<Product> page) {
-        List<ProductResponse> responses = page.getContent().stream()
+    public static ProductListResponse from(Slice<Product> slice) {
+        List<ProductResponse> responses = slice.getContent().stream()
                 .map(ProductResponse::from)
                 .toList();
-        PageMetadata metadata = new PageMetadata(
-                page.getNumber(),
-                page.getSize(),
-                page.getTotalElements(),
-                page.getTotalPages(),
-                page.hasNext(),
-                page.hasPrevious());
+        SliceMetadata metadata = new SliceMetadata(
+                slice.getNumber(),
+                slice.getSize(),
+                slice.getNumberOfElements(),
+                slice.hasNext(),
+                slice.hasPrevious());
         return new ProductListResponse(responses, metadata);
     }
 }
