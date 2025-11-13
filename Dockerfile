@@ -17,6 +17,10 @@ WORKDIR /app
 # Copy the built application
 COPY --from=build /workspace/target/ecommerce-service-0.0.1-SNAPSHOT.jar app.jar
 
+# Prepare log directory for file appender
+RUN mkdir -p /var/log/ecommerce
+ENV LOG_HOME=/var/log/ecommerce
+
 # Expose application port
 EXPOSE 8080
 
