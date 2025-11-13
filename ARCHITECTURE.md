@@ -1,6 +1,92 @@
 # Architecture Overview
 
-This document captures the current relational schema that Liquibase applies when the service boots. Keep this section synchronized with the change logs under `src/main/resources/db/changelog`.
+This document captures how the Spring Boot monolith is structured today: a single deployment that exposes multiple controllers (auth, catalog, favorites, admin, order) backed by layered services and Spring Security. Read-heavy public endpoints are routed through a custom `AbstractRoutingDataSource` to the MySQL replicas, while writes and strongly-consistent reads (admin mutations, checkout, authentication) always hit the primary. Keep this section synchronized with the change logs under `src/main/resources/db/changelog` and the current application wiring.
+
+## Architecture Diagram
+
+```mermaid
+flowchart TB
+    %% === Entry Points ===
+    subgraph Clients["Client Channels"]
+        C1[Web Frontend]
+        C2[Mobile App]
+    end
+    C1 & C2 --> LB["API Gateway / Load Balancer"]
+    LB --> APP["Spring Boot Monolith"]
+
+    %% === Controllers ===
+    subgraph Controllers["Controller Layer"]
+        AUTH["AuthController\n/login"]
+        PRODUCT["ProductController\n(public browse/detail)"]
+        FAVORITE["FavoriteController\n(user favorites)"]
+        ADMIN["AdminProductController\n(admin CRUD)"]
+        ORDER["OrderController\n(user checkout)"]
+    end
+    APP --> AUTH & PRODUCT & FAVORITE & ADMIN & ORDER
+
+    %% === Services ===
+    subgraph Services["Service Layer"]
+        ProductSrv["ProductQueryService"]
+        FavoriteSrv["FavoriteService"]
+        AdminSrv["AdminProductService"]
+        OrderSrv["CheckoutService\n+ OrderQueryService"]
+        PaymentSrv["Payment Worker"]
+    end
+    PRODUCT --> ProductSrv
+    FAVORITE --> FavoriteSrv
+    ADMIN --> AdminSrv
+    ORDER -->|create order with PENDING status| OrderSrv
+
+    subgraph PaymentFlow["Payment Callback Flow"]
+        PaymentWebhook["Payment Webhook Controller"]
+        MQ["Message Queue"]
+        PaymentSrv["Payment Worker"]
+        PaymentWebhook --> OrderSrv
+        PaymentWebhook --> MQ
+        MQ --> PaymentSrv
+    end
+
+    %% === Security / Cross-cutting ===
+    subgraph Security["Security & Common"]
+        JwtFilter["JwtAuthenticationFilter"]
+        JwtSvc["JwtService"]
+        GlobalEx["GlobalExceptionHandler"]
+        Docs["OpenAPI / Swagger UI"]
+    end
+    APP --> JwtFilter
+    JwtFilter --> JwtSvc
+    APP --> GlobalEx
+    APP --> Docs
+
+    %% === Data Access ===
+    ProductSrv -->|public browse| READPOOL{{Read Replica Routing with LazyConnectionDataSourceProxy}}
+    FavoriteSrv -->|@Transactional with readOnly=true| READPOOL
+    OrderSrv -->|order lookups| PRIMARY
+    FavoriteSrv -->|writes / mutations| PRIMARY[(MySQL Primary)]
+    AdminSrv --> PRIMARY
+    OrderSrv -->|checkout + persistence| PRIMARY
+    PaymentSrv -->|update status / release stock if fail| PRIMARY
+    JwtFilter -->|loadUserByUsername| PRIMARY
+
+    READPOOL --> REPL1[(Replica 1)]
+    READPOOL --> REPL2[(Replica 2)]
+    READPOOL --> REPL3[(Replica 3)]
+    PRIMARY -.replication.-> REPL1
+    PRIMARY -.replication.-> REPL2
+    PRIMARY -.replication.-> REPL3
+
+    PRIMARY --> USERS[(Users Table)]
+    PRIMARY --> PRODUCTS[(Products & Favorites Tables)]
+    PRIMARY --> ORDERS[(Orders & OrderItems)]
+
+    classDef db fill:#cfe2ff,stroke:#004c97,stroke-width:1.2px,color:#00264d;
+    classDef service fill:#b7f0b1,stroke:#1d7c32,stroke-width:1.2px,color:#0a3b12;
+    classDef cross fill:#ffe5b4,stroke:#cc7a00,stroke-width:1.2px,color:#4a2c00;
+
+    class PRIMARY,USERS,PRODUCTS,ORDERS,REPL1,REPL2,REPL3 db;
+    class ProductSrv,FavoriteSrv,AdminSrv,OrderSrv service;
+    class JwtFilter,JwtSvc,GlobalEx,Docs cross;
+```
 
 ## Database Schema (MySQL)
 
