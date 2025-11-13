@@ -2,6 +2,7 @@ package com.jimmyweng.ecommerce.service.product;
 
 import com.jimmyweng.ecommerce.constant.ErrorMessages;
 import com.jimmyweng.ecommerce.exception.ResourceNotFoundException;
+import com.jimmyweng.ecommerce.logging.LogExecution;
 import com.jimmyweng.ecommerce.model.product.Product;
 import com.jimmyweng.ecommerce.repository.product.ProductRepository;
 import java.util.Locale;
@@ -33,6 +34,7 @@ public class ProductQueryService {
         this.fullTextMinLength = fullTextMinLength;
     }
 
+    @LogExecution
     public Slice<Product> listProducts(String category, String keyword, Pageable pageable) {
         String normalizedCategory = StringUtils.hasText(category) ? category.trim().toLowerCase(Locale.ROOT) : null;
         String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim() : null;

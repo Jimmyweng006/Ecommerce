@@ -6,6 +6,7 @@ import com.jimmyweng.ecommerce.controller.common.doc.ProductListEnvelopeDoc;
 import com.jimmyweng.ecommerce.controller.common.doc.ProductResponseEnvelopeDoc;
 import com.jimmyweng.ecommerce.controller.product.dto.ProductListResponse;
 import com.jimmyweng.ecommerce.controller.product.dto.ProductResponse;
+import com.jimmyweng.ecommerce.logging.LogExecution;
 import com.jimmyweng.ecommerce.model.product.Product;
 import com.jimmyweng.ecommerce.service.product.ProductQueryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -44,6 +45,7 @@ public class ProductController {
         @ApiResponse(responseCode = "200", description = "Products retrieved",
                 content = @Content(schema = @Schema(implementation = ProductListEnvelopeDoc.class)))
     })
+    @LogExecution
     @GetMapping
     public ProductListResponse listProducts(
             @Parameter(description = "Page number (0-indexed)", example = "0")

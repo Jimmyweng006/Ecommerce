@@ -74,6 +74,17 @@ The API is documented with OpenAPI 3 via springdoc-openapi:
   - Each replica mounts `conf.d/replica.cnf` and `initdb/replica/01-configure-replication.sh`, which waits for the primary and executes `CHANGE REPLICATION SOURCE TO ... START REPLICA`.
 - Verify replica health with `docker exec -it ecommerce-db-replica-1 mysql -uroot -prootpassword -e "SHOW REPLICA STATUS\G"` (expect `Replica_IO_Running` and `Replica_SQL_Running` = Yes, `Seconds_Behind_Master` near 0).
 
+### Request Correlation
+
+- `RequestCorrelationFilter` copies `X-Request-ID` from the inbound request (or generates a UUID) and echoes it back in the response while storing it in the MDC.
+- Any method annotated with `@LogExecution` will log entry/exit, arguments, and execution time including `corrId=*`, so you can trace a single request across controller/service boundaries.
+
+### Logging
+
+- Logback is configured via `logback-spring.xml` to write both to the console and to `logs/application.log` (daily rollover, 14-day retention).
+- Override the file log directory with `LOG_HOME=/var/log/ecommerce` (the Docker image sets this by default) to emit logs under that path.
+- View file logs via `tail -f logs/application.log` on your host or `docker exec ecommerce-app tail -f /var/log/ecommerce/application.log` inside the container.
+
 ## Test
 
 ### Unit tests
