@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0008-drop-products-category-index
+      author: codex
+      changes:
+        - dropIndex:
+            tableName: products
+            indexName: idx_products_category
+      rollback:
+        - createIndex:
+            tableName: products
+            indexName: idx_products_category
+            columns:
+              - column:
+                  name: category

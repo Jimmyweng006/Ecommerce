@@ -47,9 +47,12 @@ public class ProductQueryService {
                     org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly());
         }
 
-        boolean useFullText = fullTextEnabled
-                && StringUtils.hasText(normalizedKeyword)
-                && normalizedKeyword.length() >= fullTextMinLength;
+        boolean hasKeyword = StringUtils.hasText(normalizedKeyword);
+        if (!hasKeyword) {
+            return productRepository.searchActiveProductsByCategory(normalizedCategory, pageable);
+        }
+
+        boolean useFullText = fullTextEnabled && normalizedKeyword.length() >= fullTextMinLength;
         if (useFullText) {
             return productRepository.searchActiveProductsFullText(normalizedCategory, normalizedKeyword, pageable);
         }

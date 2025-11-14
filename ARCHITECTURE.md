@@ -111,8 +111,9 @@ CREATE TABLE products (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
+    version BIGINT NOT NULL,
     FULLTEXT KEY idx_products_title_description_fulltext (title, description),
-    KEY idx_products_category (category)
+    KEY idx_products_deleted_category_created (deleted_at, category, created_at)
 ) ENGINE = InnoDB;
 
 CREATE TABLE orders (

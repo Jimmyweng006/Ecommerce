@@ -50,5 +50,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     Slice<Product> searchActiveProductsFullText(
             @Param("category") String category, @Param("keyword") String keyword, Pageable pageable);
 
+    @Query("""
+            select p from Product p
+            where p.deletedAt is null
+              and (:category is null or p.category = :category)
+            order by p.createdAt desc
+            """)
+    Slice<Product> searchActiveProductsByCategory(
+            @Param("category") String category, Pageable pageable);
+
     void deleteByTitleStartingWith(String titlePrefix);
 }
