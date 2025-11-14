@@ -1,8 +1,42 @@
-# Architecture Overview
+## Objective
 
-This document captures how the Spring Boot monolith is structured today: a single deployment that exposes multiple controllers (auth, catalog, favorites, admin, order) backed by layered services and Spring Security. Read-heavy public endpoints are routed through a custom `AbstractRoutingDataSource` to the MySQL replicas, while writes and strongly-consistent reads (admin mutations, checkout, authentication) always hit the primary. Keep this section synchronized with the change logs under `src/main/resources/db/changelog` and the current application wiring.
+- Deliver a resilient e-commerce backend that supports authenticated browsing, favorites, checkout, and admin maintenance while protecting all write paths with JWT/role-based access control.
+- Using read/write separation, composite indexes, idempotency, and observability (correlation IDs, LogExecution, general logs when needed).
+- Keep infrastructure reproducible via Docker Compose: one MySQL primary plus three replicas, Spring Boot app, Liquibase-managed schema migrations.
+- Set the stage for asynchronous payment settlement (Webhook + MQ + worker) so checkout completes quickly and payment status can be updated later without data loss.
 
-## Architecture Diagram
+## Terminology
+
+### Read/Write Separation
+
+- Docker Compose provisions one MySQL primary plus three asynchronous replicas. Writes, Liquibase migrations, and any `@ReadFromPrimary` operations target the primary.
+- Spring Boot registers a custom `AbstractRoutingDataSource` (`ReadReplicaRoutingDataSource`) that checks `TransactionSynchronizationManager.isCurrentTransactionReadOnly()` and round-robins queries across the configured replicas. If no replica is configured or a request enforces primary routing, it falls back automatically.
+- Services that require strongly consistent reads (e.g., `OrderQueryService`) annotate with `@ReadFromPrimary`, which flips a ThreadLocal flag through an aspect so even read-only transactions hit the primary.
+
+## Requirements
+
+### Functional
+
+- Issue JWT tokens via `POST /api/v1/auth/login`; enforce roles (`ROLE_USER`, `ROLE_ADMIN`) on all protected endpoints.
+- Public catalog APIs expose pagination, category filtering, and keyword search; details endpoint returns only active (non-deleted) products.
+- Favorites API allows users to add/list/remove favorites idempotently while filtering out deleted products.
+- Admin APIs manage product lifecycle (create/update/soft-delete) with optimistic locking (`@Version`) and audit fields.
+- Checkout API performs atomic stock decrement, records idempotency key, and persists `OrderStatus = PENDING`; order retrieval enforces ownership or admin role.
+- Payment flow: external provider hits Webhook, system enqueues `PaymentResultEvent`, worker updates order status (COMPLETED/FAILED) and releases stock if necessary.
+
+### Non Functional
+
+| Area | Requirement                                                                                                                                                                       |
+| --- |-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Security | Enforce Spring Security + JWT + `@PreAuthorize`; log every request with `@LogExecution` + correlation ID; admin-only endpoints protect inventory, pricing, and payment callbacks. |
+| Performance | Target response time < 300ms p95 using composite indexes, read/write separation, and Slice queries.                                 |
+| Reliability | All writes run inside transactions; optimistic locking + soft delete prevent lost updates; payment Webhook + MQ/outbox ensures eventual status updates even if worker crashes.    |
+| Data Consistency | Primary handles writes and strongly consistent reads (`@ReadFromPrimary`), replicas serve read-only traffic; stock decrement uses atomic SQL, orders rely on idempotency keys.    |
+| Scalability | Docker Compose allows adding replicas quickly; routing datasource can expand target nodes.                               |
+
+## Design
+
+### Architecture Overview (with diagrams)
 
 ```mermaid
 flowchart TB
@@ -88,7 +122,38 @@ flowchart TB
     class JwtFilter,JwtSvc,GlobalEx,Docs cross;
 ```
 
-## Database Schema (MySQL)
+### Component Design (key modules/services)
+
+| Service | Responsibilities |
+| --- | --- |
+| AuthController / SecurityConfig | Handle JWT login, authenticate/authorize every request, expose password encoder and authentication manager. |
+| ProductController / ProductQueryService | Public browse/detail endpoints, apply pagination/category/full-text filters, route read-only traffic to replicas, convert entities to DTOs. |
+| FavoriteController / FavoriteService | Manage user favorites with idempotent add/remove, validate product existence, load favorite list ordered by `created_at`. |
+| AdminProductController / AdminProductService | CRUD for products, enforce `ROLE_ADMIN`, wrap updates with optimistic locking and soft delete semantics. |
+| OrderController / CheckoutService / OrderQueryService | Create orders with atomic stock decrement + idempotency key, serve order detail only to owners/admins, mark deleted products as inaccessible. |
+| Payment Webhook Controller / Payment Worker | Accept third-party callbacks, enqueue events, update order status asynchronously (COMPLETED/FAILED) and release stock on failure. |
+
+
+### Interface Design
+
+- **Auth**
+    - `POST /api/v1/auth/login` – Exchange credentials for a JWT access token. (Registration endpoint to be added.)
+- **Admin**
+    - `POST /api/v1/admin/products` – Create a product (requires `ROLE_ADMIN`, optimistic locking enabled).
+    - `PUT /api/v1/admin/products/{productId}` – Update product details and stock (requires `ROLE_ADMIN`).
+    - `DELETE /api/v1/admin/products/{productId}` – Soft-delete a product (requires `ROLE_ADMIN`).
+- **Orders**
+    - `POST /api/v1/orders` – Create an order for the authenticated user with atomic stock decrement (requires `ROLE_USER`).
+    - `GET /api/v1/orders/{orderId}` – Retrieve order details (owner or `ROLE_ADMIN` only).
+- **Products**
+    - `GET /api/v1/products` – Browse active products with pagination, category filter, and keyword search (public).
+    - `GET /api/v1/products/{productId}` – Retrieve a specific product's details (public).
+- **Favorites**
+    - `POST /api/v1/favorites` – Add a product to the authenticated user's favorites list (requires `ROLE_USER`).
+    - `GET /api/v1/favorites` – Retrieve the authenticated user's favorite products in reverse chronological order.
+    - `DELETE /api/v1/favorites/{productId}` – Remove a product from the favorites list (idempotent, requires `ROLE_USER`).
+
+### Data Structure Design
 
 ```sql
 CREATE TABLE users (
@@ -158,13 +223,7 @@ CREATE TABLE favorites (
 ) ENGINE = InnoDB;
 ```
 
-## Read/Write Separation
-
-- Docker Compose provisions one MySQL primary plus three asynchronous replicas. Writes, Liquibase migrations, and any `@ReadFromPrimary` operations target the primary.
-- Spring Boot registers a custom `AbstractRoutingDataSource` (`ReadReplicaRoutingDataSource`) that checks `TransactionSynchronizationManager.isCurrentTransactionReadOnly()` and round-robins queries across the configured replicas. If no replica is configured or a request enforces primary routing, it falls back automatically.
-- Services that require strongly consistent reads (e.g., `OrderQueryService`) annotate with `@ReadFromPrimary`, which flips a ThreadLocal flag through an aspect so even read-only transactions hit the primary.
-
-## Authentication Flow
+### Authentication Flow
 
 The diagram below illustrates how Spring Security mediates requests, checking credentials on login and validating JWTs on subsequent calls before delegating to application controllers.
 
@@ -203,7 +262,7 @@ graph TD
     AuthController --> JwtService
 ```
 
-## Admin Product Management Flow
+### Admin Product Management Flow
 
 The sequence below outlines how the Admin role creates, updates, or deletes products while relying on our existing JWT security pipeline and layered responsibilities:
 
@@ -221,10 +280,10 @@ sequenceDiagram
         Security-->>Admin: 401/403 Error Response
     else Authorized
         Security->>Controller: Forward request with principal
-        Controller->>Service: handle command DTO
-        Service->>Repo: Persist product changes
-        Repo-->>Service: Product entity
         alt Create request
+            Controller->>Service: handle command DTO
+            Service->>Repo: Persist product changes
+            Repo-->>Service: Product entity
             Service-->>Controller: Created product summary
             Controller-->>Admin: 201 Created
         else Update request
@@ -259,7 +318,7 @@ Order flows must protect inventory integrity under concurrent access. The table 
 
 Plan: use atomic SQL for user purchases to minimize contention, optionally complement with optimistic locking for admin-facing updates. Pessimistic locking remains a fallback when business rules demand strict serialization; ensure a consistent locking order to avoid deadlocks.
 
-## User Product Purchase Flow
+### User Product Purchase Flow
 
 The following sequence illustrates how a customer checks out a cart. Stock deductions rely on atomic SQL updates to avoid overselling while all operations remain within a single transaction.
 
@@ -304,7 +363,7 @@ Key points:
 - Products are processed in deterministic order (by product id) to reduce deadlock risk.
 - Any failure (stock < requested quantity) results in a transaction rollback and a conflict response.
 
-## User Favorites Management Flow
+### User Favorites Management Flow
 
 ```mermaid
 sequenceDiagram
@@ -341,7 +400,7 @@ sequenceDiagram
     end
 ```
 
-## Product Browsing Flow
+### Product Browsing Flow
 
 ```mermaid
 sequenceDiagram
@@ -360,7 +419,7 @@ sequenceDiagram
     ProductsApi-->>Visitor: 200 OK (ret_code 0, data contains items + page meta)
 ```
 
-## Product Details Flow
+### Product Details Flow
 
 ```mermaid
 sequenceDiagram
@@ -385,7 +444,7 @@ sequenceDiagram
     end
 ```
 
-## Order Details Flow
+### Order Details Flow
 
 ```mermaid
 sequenceDiagram
@@ -420,3 +479,16 @@ sequenceDiagram
         end
     end
 ```
+
+## Design Checklist
+
+| Consideration | Comments                                                                                                                                                                        |
+| --- |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Error Handling | API responses use a consistent envelope via `GlobalExceptionHandler` and `ApiResponseEnvelope`; validation/auth/optimistic-lock errors surface as structured ret_code/msg/meta. |
+| Security | JWT auth filter, `@PreAuthorize`, and admin-only endpoints guard sensitive paths; correlation IDs + LogExecution aid auditing.                                                  |
+| Performance | Composite indexes, read/write routing, Slice queries, and planned Redis/ProxySQL keep p95 latency < 300ms.                                                                      |
+| Reliability | Transactions, optimistic locking, idempotency keys, and MQ-ready payment flow prevent double writes or lost events; soft delete avoids destructive deletes.                     |
+| Data Consistency | Primary handles writes/strong reads; replicas serve browse traffic; payment worker reconciles status asynchronously but deterministically.                                      |
+| Scalability | Docker Compose can spin up more replicas; read routing can add nodes; MQ decouples payment from checkout for easier horizontal scaling.                                         |
+| Testability | Layered architecture (controller/service/repository) eases unit testing; integration tests run via Maven Failsafe with H2 or real MySQL containers.                             |
+| Compatibility | REST+JSON APIs documented via Swagger/OpenAPI; Webhook contract follows standard JSON payload + HMAC validation for payment callbacks.                                          |

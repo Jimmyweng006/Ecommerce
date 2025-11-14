@@ -119,5 +119,5 @@ Generates coverage reports under `target/site/jacoco/index.html`.
 
 ## Document
 
-- [Tech Design](ARCHITECTURE.md)
+- [Tech Design](TECH_DESIGN.md)
 - [Load Testing Experiment](EXPERIMENT.md)
