@@ -94,7 +94,7 @@ flowchart TB
 
     %% === Data Access ===
     ProductSrv -->|public browse| READPOOL{{Read Replica Routing with LazyConnectionDataSourceProxy}}
-    FavoriteSrv -->|@Transactional with readOnly=true| READPOOL
+    FavoriteSrv -->|Transactional read-only| READPOOL
     OrderSrv -->|order lookups| PRIMARY
     FavoriteSrv -->|writes / mutations| PRIMARY[(MySQL Primary)]
     AdminSrv --> PRIMARY
